@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-label: "Jost", "Helvetica Neue", sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  /* Paleta: nude, cacau e rosé (rose gold) */
+  --color-cacau-950: #1f1715;
+  --color-cacau-900: #2a201d;
+  --color-cacau-800: #3a2d29;
+  --color-cacau-700: #4d3c37;
+  --color-cacau-600: #6b5650;
+  --color-cacau-500: #8a736b;
+
+  --color-nude-50: #fbf7f3;
+  --color-nude-100: #f5ede6;
+  --color-nude-200: #ecdfd4;
+  --color-nude-300: #dcc8b8;
+  --color-nude-400: #c4ab98;
+
+  --color-blush-100: #f6e4dc;
+  --color-blush-200: #efcfc2;
+  --color-blush-300: #e7b8a8;
+  --color-blush-400: #d69a87;
+  --color-blush-500: #c07f6b;
+  --color-blush-600: #a5664f;
+  --color-blush-700: #85503d;
+
+  --animate-fade-up: fade-up 0.7s ease-out both;
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+
+/* Celular: a página nunca arrasta para os lados. `clip` (e não `hidden`)
+   para não quebrar o header fixo. */
+html, body { overflow-x: clip; max-width: 100%; }
+
+/* iPhone dá zoom ao focar campos com fonte < 16px. */
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px !important; }
+}
+.font-display { font-variant-numeric: lining-nums; }
+body {
+  @apply bg-nude-50 text-cacau-800 font-sans antialiased;
+}
+
+/* Textura de grão bem sutil */
+.grain {
+  position: relative;
+}
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 font-label uppercase tracking-[0.18em] text-[13px] font-medium px-7 py-3.5 rounded-full transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer;
+}
+@utility btn-primary {
+  @apply btn bg-cacau-900 text-nude-50 hover:bg-blush-700;
+}
+@utility btn-blush {
+  @apply btn bg-blush-600 text-white hover:bg-blush-700;
+}
+@utility btn-ghost {
+  @apply btn border border-cacau-900/25 text-cacau-900 hover:border-blush-600 hover:text-blush-700;
+}
+
+@utility input {
+  @apply w-full bg-white border border-nude-300 text-cacau-900 px-4 py-3 rounded-xl outline-none focus:border-blush-500 placeholder:text-nude-400 transition-colors;
+}
+@utility label {
+  @apply block text-xs font-medium text-cacau-600 mb-1.5;
+}
+
+/* Moldura em arco, marca visual do estúdio */
+@utility arco {
+  border-radius: 999px 999px 1.25rem 1.25rem;
+}
+
+.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #dcc8b8; border-radius: 3px; }
+
+/* Painel: cartão padrão */
+@utility card {
+  @apply bg-white border border-nude-200 rounded-2xl;
+}
