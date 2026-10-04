@@ -7,7 +7,6 @@ import {
 import Logo from '../../components/ui/Logo'
 import { GoogleG } from '../../components/site/Agendamento'
 import { useStore } from '../../store/Store'
-import { reservaExpirada } from '../../lib/schedule'
 import Inicio from './Inicio'
 import Agenda from './Agenda'
 import Clientes from './Clientes'
@@ -50,7 +49,6 @@ export default function AdminApp() {
   }
 
   const badges = {
-    agenda: db.agendamentos.filter((a) => a.status === 'aguardando_sinal' && !reservaExpirada(a)).length,
     financeiro: db.pendencias.filter((m) => m.status === 'aberta').length,
   }
 

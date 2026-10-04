@@ -1,12 +1,9 @@
 import { toMin, fromMin, fromISO, toISO, addDays } from './format'
 
 /** Status que ocupam espaço na agenda. Falta e cancelado liberam o horário. */
-export const STATUS_OCUPA = ['aguardando_sinal', 'confirmado', 'concluido', 'bloqueio']
+export const STATUS_OCUPA = ['agendado', 'concluido', 'bloqueio']
 
-/** Reserva esperando o Pix do sinal que já passou do prazo não segura mais o horário. */
-export const reservaExpirada = (a, agora = Date.now()) => a.status === 'aguardando_sinal' && a.expiraEm && a.expiraEm < agora
-
-export const ocupaAgenda = (a) => STATUS_OCUPA.includes(a.status) && !reservaExpirada(a)
+export const ocupaAgenda = (a) => STATUS_OCUPA.includes(a.status)
 
 /** Lista de horários de início possíveis num dia, respeitando o almoço. */
 export function gerarSlots(config) {

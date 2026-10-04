@@ -1,21 +1,21 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Wallet, CalendarPlus, Save, Cake, Sparkles, Plus, Minus } from 'lucide-react'
+import { AlertTriangle, CalendarPlus, Save, Cake, Sparkles } from 'lucide-react'
 import Modal from '../ui/Modal'
 import { WhatsApp } from '../ui/Icones'
-import { Avatar, Abas, Botao, Status, Vazio, Campo, Etiqueta } from './ui'
+import { Avatar, Abas, Botao, Status, Vazio, Campo } from './ui'
 import { Pilulas } from './Escolhas'
 import ModalEncaixe from './ModalEncaixe'
 import ModalDebito from './ModalDebito'
 import { useStore } from '../../store/Store'
-import { resumoClientes } from '../../lib/stats'
+import { resumoClientes, emManutencao } from '../../lib/stats'
 import { brl, dataBR, dataCurta, diasEntreISO, toISO, telefoneMask, waNumero } from '../../lib/format'
 
-const ESTILOS = ['Fio a Fio', 'Volume Brasileiro', 'Volume Egípcio', 'Volume Russo', 'Lash Lifting']
 const CURVATURAS = ['B', 'C', 'CC', 'D', 'L', 'M']
 const ESPESSURAS = ['0.05', '0.07', '0.10', '0.12', '0.15']
 
 export default function FichaCliente({ clienteId, onFechar }) {
-  const { db, salvarCliente, ajustarCredito, avisar } = useStore()
+  const { db, salvarCliente, avisar } = useStore()
+  const ESTILOS = db.servicos.filter((s) => s.categoria === 'cilios').sort((a, b) => a.ordem - b.ordem).map((s) => s.nome)
   const c = useMemo(() => resumoClientes(db).find((x) => x.id === clienteId), [db, clienteId])
   const [aba, setAba] = useState('ficha')
   const [ficha, setFicha] = useState({ ...(c?.ficha || {}) })
@@ -27,7 +27,7 @@ export default function FichaCliente({ clienteId, onFechar }) {
   const ags = db.agendamentos.filter((a) => a.clienteId === c.id).sort((a, b) => (b.data + b.hora).localeCompare(a.data + a.hora))
   const pendencias = db.pendencias.filter((m) => m.clienteId === c.id)
   const hoje = toISO(new Date())
-  const diasExt = c.ultimaExtensao ? diasEntreISO(c.ultimaExtensao, hoje) : null
+  const diasCilios = c.ultimaCilios ? diasEntreISO(c.ultimaCilios, hoje) : null
   const fichaAlterada = JSON.stringify(ficha) !== JSON.stringify(c.ficha || {})
   const dadosAlterados = ['nome', 'telefone', 'email', 'aniversario', 'notas'].some((k) => (dados[k] || '') !== (c[k] || ''))
   const setF = (k) => (v) => setFicha({ ...ficha, [k]: typeof v === 'string' ? v : v.target.value })
@@ -63,10 +63,11 @@ export default function FichaCliente({ clienteId, onFechar }) {
       {/* Alertas: o que a Ana precisa ver antes de atender */}
       <div className="space-y-2 mb-5">
         {c.ficha?.alergias && <Alerta cor="red" icone={AlertTriangle}>{c.ficha.alergias}</Alerta>}
-        {c.devendo > 0 && <Alerta cor="amber" icone={AlertTriangle}>Bloqueada para agendar pelo site: {brl(c.devendo)} em aberto.</Alerta>}
-        {c.credito > 0 && <Alerta cor="emerald" icone={Wallet}>Tem {brl(c.credito)} de crédito, usado automaticamente no próximo sinal.</Alerta>}
-        {diasExt != null && !c.proximo && diasExt >= db.config.manutencaoDias - 7 && (
-          <Alerta cor="violet" icone={Sparkles}>Última extensão há {diasExt} dias ({dataCurta(c.ultimaExtensao)}) e nenhum horário marcado.</Alerta>
+        {c.devendo > 0 && <Alerta cor="amber" icone={AlertTriangle}>Bloqueada para agendar pelo site: {brl(c.devendo)} em multas/débitos.</Alerta>}
+        {emManutencao(c, hoje) && (
+          <Alerta cor="violet" icone={Sparkles}>
+            Manutenção vencendo: {c.ultimaCiliosItem?.nome} há {diasCilios} dias (prazo de {c.prazoManutencao}) e nenhum horário marcado.
+          </Alerta>
         )}
       </div>
 
@@ -88,13 +89,14 @@ export default function FichaCliente({ clienteId, onFechar }) {
         {c.proximo && <span>Próximo: <span className="text-cacau-800">{dataCurta(c.proximo.data)} às {c.proximo.hora}</span></span>}
       </p>
 
-      <Abas valor={aba} onChange={setAba} abas={[['ficha', 'Ficha técnica'], ['historico', 'Histórico', ags.length], ['financeiro', 'Financeiro'], ['dados', 'Dados']]} />
+      <Abas valor={aba} onChange={setAba} abas={[['ficha', 'Ficha técnica'], ['historico', 'Histórico', ags.length], ['financeiro', 'Multas'], ['dados', 'Dados']]} />
 
       <div className="mt-4">
         {aba === 'ficha' && (
           <div className="space-y-4">
             <p className="text-xs text-cacau-500">O "mapa" dela, para repetir a aplicação igualzinha na manutenção.</p>
-            <Campo rotulo="Estilo atual"><Pilulas valor={ficha.estilo} onChange={setF('estilo')} opcoes={ESTILOS.map((e) => [e, e])} /></Campo>
+            <Campo rotulo="Modelo atual"><Pilulas valor={ficha.estilo} onChange={setF('estilo')} opcoes={ESTILOS.map((e) => [e, e])} /></Campo>
+            <Campo rotulo="Cor dos fios"><Pilulas valor={ficha.cor || 'Preto'} onChange={setF('cor')} opcoes={[['Preto', 'Preto'], ['Marrom', 'Marrom']]} /></Campo>
             <div className="grid sm:grid-cols-2 gap-4">
               <Campo rotulo="Curvatura"><Pilulas valor={ficha.curvatura} onChange={setF('curvatura')} opcoes={CURVATURAS.map((e) => [e, e])} /></Campo>
               <Campo rotulo="Espessura (mm)"><Pilulas valor={ficha.espessura} onChange={setF('espessura')} opcoes={ESPESSURAS.map((e) => [e, e])} /></Campo>
@@ -135,19 +137,9 @@ export default function FichaCliente({ clienteId, onFechar }) {
 
         {aba === 'financeiro' && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between gap-3 bg-nude-50 rounded-2xl p-4">
-              <div>
-                <div className="text-xs text-cacau-500">Crédito disponível</div>
-                <div className="text-xl font-semibold text-cacau-900 tabular-nums">{brl(c.credito || 0)}</div>
-              </div>
-              <div className="flex gap-1">
-                <Botao variante="sec" className="!px-3" title="Tirar R$ 10" onClick={() => ajustarCredito(c.id, -10)} disabled={!c.credito}><Minus size={14} /> 10</Botao>
-                <Botao variante="sec" className="!px-3" title="Dar R$ 10" onClick={() => ajustarCredito(c.id, 10)}><Plus size={14} /> 10</Botao>
-              </div>
-            </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-cacau-900">Pendências</h4>
+                <h4 className="text-sm font-semibold text-cacau-900">Multas e débitos</h4>
                 <Botao className="!py-1.5" onClick={() => setDebito(true)}>+ Lançar débito</Botao>
               </div>
               {pendencias.length === 0 ? <Vazio texto="Nenhuma pendência. Cliente em dia." /> : (
@@ -164,12 +156,7 @@ export default function FichaCliente({ clienteId, onFechar }) {
                 </ul>
               )}
             </div>
-            <p className="text-xs text-cacau-500 flex flex-wrap gap-2 items-center">
-              Sinais desta cliente:
-              <Etiqueta cls="text-amber-800 bg-amber-50 border-amber-200">{ags.filter((a) => a.sinal?.destino === 'retido').length} retido(s)</Etiqueta>
-              <Etiqueta cls="text-emerald-800 bg-emerald-50 border-emerald-200">{ags.filter((a) => a.sinal?.destino === 'credito').length} viraram crédito</Etiqueta>
-              <Etiqueta>{ags.filter((a) => a.sinal?.destino === 'devolvido').length} devolvido(s)</Etiqueta>
-            </p>
+            <p className="text-xs text-cacau-500">{c.faltas} falta(s) e {c.cancelamentos} cancelamento(s) no histórico.</p>
           </div>
         )}
 

@@ -1,29 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { QRCodeSVG } from 'qrcode.react'
-import { Check, CalendarX2, CalendarCheck2, Clock, Copy, Loader2, ArrowLeft, Timer, QrCode, AlertCircle, Lock, ShieldAlert, Wallet } from 'lucide-react'
+import { CalendarX2, CalendarCheck2, Clock, AlertCircle, Lock, ShieldAlert, QrCode, X } from 'lucide-react'
 import { TituloSecao } from '../ui/Ornamento'
 import { WhatsApp } from '../ui/Icones'
-import { CATEGORIAS } from '../../data/seed'
+import SeletorServicos, { parteDe } from '../ui/SeletorServicos'
 import { useStore, pendenciasAbertasDe, servicosAtivos } from '../../store/Store'
-import { brl, dataCurta, dataLonga, DIAS_CURTOS, fromISO, telefoneMask, toMin, fromMin, duracaoLabel, sinalDe, pad, primeiroNome } from '../../lib/format'
+import { brl, dataCurta, dataLonga, DIAS_CURTOS, fromISO, telefoneMask, toMin, fromMin, duracaoLabel, primeiroNome } from '../../lib/format'
 import { gerarSlots, diaAberto, intervalosOcupados, slotLivre, proximosDias } from '../../lib/schedule'
-import { gerarPix } from '../../lib/pix'
+import { itensDe } from '../../lib/catalogo'
 
-function Passo({ n, titulo, children, ativo = true }) {
+function Passo({ n, titulo, children }) {
   return (
-    <div className={`transition-opacity ${ativo ? '' : 'opacity-35 pointer-events-none'}`}>
-      <div className="flex items-center gap-3 mb-4">
-        <span className="h-7 w-7 rounded-full bg-cacau-900 text-nude-50 font-label text-sm flex items-center justify-center">{n}</span>
-        <h3 className="font-label uppercase tracking-[0.2em] text-cacau-900 text-sm">{titulo}</h3>
-      </div>
+    <div className="animate-fade-up">
+      <h3 className="flex items-center gap-2.5 text-sm font-medium text-cacau-900 mb-3">
+        <span className="h-6 w-6 rounded-full bg-blush-100 text-blush-700 text-xs flex items-center justify-center">{n}</span>
+        {titulo}
+      </h3>
       {children}
     </div>
   )
 }
 
 export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias }) {
-  const { db, usuario, reservar, confirmarSinal, descartarReserva } = useStore()
+  const { db, usuario, criarAgendamento } = useStore()
   const { config } = db
   const servicos = servicosAtivos(db)
   const [selecionados, setSelecionados] = useState([])
@@ -31,13 +30,13 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
   const [hora, setHora] = useState(null)
   const [telefone, setTelefone] = useState('')
   const [erro, setErro] = useState('')
-  const [reservaId, setReservaId] = useState(null) // reserva criada (aguardando Pix ou já confirmada)
+  const [confirmadoId, setConfirmadoId] = useState(null)
 
   useEffect(() => {
     if (servicoInicial) {
       setSelecionados([servicoInicial.id])
       setHora(null)
-      setReservaId(null)
+      setConfirmadoId(null)
     }
   }, [servicoInicial])
 
@@ -45,26 +44,21 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
     if (usuario?.telefone) setTelefone(usuario.telefone)
   }, [usuario?.id, usuario?.telefone])
 
-  const itens = selecionados.map((id) => servicos.find((s) => s.id === id)).filter(Boolean)
-  const duracao = itens.reduce((s, i) => s + i.duracao, 0)
-  const total = itens.reduce((s, i) => s + i.preco, 0)
-  const sinal = sinalDe(total, config.sinalPct)
-  const credito = usuario?.tipo === 'cliente' ? usuario.credito || 0 : 0
-  const creditoUsado = Math.min(credito, sinal)
+  const { itens, nomes, total, duracao } = itensDe(servicos, selecionados)
 
   const dias = useMemo(() => proximosDias(config.diasAgendaAberta), [config])
   const slots = useMemo(() => gerarSlots(config), [config])
   const ocupados = useMemo(() => (data ? intervalosOcupados(db.agendamentos, data) : []), [db.agendamentos, data])
   const diaFechado = (iso) => db.agendamentos.some((a) => a.data === iso && a.status === 'bloqueio' && a.diaInteiro)
-  const reserva = reservaId ? db.agendamentos.find((a) => a.id === reservaId) : null
+  const confirmado = confirmadoId ? db.agendamentos.find((a) => a.id === confirmadoId) : null
 
-  const toggle = (id) => {
-    setSelecionados((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+  const escolher = (vids) => {
+    setSelecionados(vids)
     setHora(null)
     setErro('')
   }
 
-  const irParaPagamento = () => {
+  const confirmar = () => {
     if (telefone.replace(/\D/g, '').length < 11) return setErro('Informe um WhatsApp válido.')
     // revalida o horário (outra cliente pode ter pego enquanto escolhia)
     if (!slotLivre(config, hora, duracao, intervalosOcupados(db.agendamentos, data), data)) {
@@ -72,18 +66,18 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
       return setErro('Ops! Esse horário acabou de ser ocupado.')
     }
     setErro('')
-    const id = reservar({
+    const id = criarAgendamento({
       clienteId: usuario.id,
       clienteNome: usuario.nome,
       clienteTelefone: telefone,
-      servicoIds: itens.map((i) => i.id),
-      servicoNomes: itens.map((i) => i.nome).join(' + '),
+      servicoIds: selecionados,
+      servicoNomes: nomes,
       total,
       duracao,
       data,
       hora,
     })
-    setReservaId(id)
+    setConfirmadoId(id)
     setSelecionados([])
     setData(null)
     setHora(null)
@@ -97,7 +91,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
       <div className="max-w-md mx-auto text-center py-12 bg-white border border-nude-200 rounded-3xl px-6 shadow-xl shadow-blush-700/5">
         <span className="h-14 w-14 rounded-full bg-blush-100 text-blush-600 flex items-center justify-center mx-auto mb-5"><Lock size={24} /></span>
         <h3 className="font-display text-3xl text-cacau-900 font-semibold mb-2">Entre para agendar</h3>
-        <p className="text-cacau-600 mb-8 text-sm leading-relaxed">É rapidinho: entre com sua conta Google. Assim você acompanha seus horários, seu crédito e recebe a confirmação.</p>
+        <p className="text-cacau-600 mb-8 text-sm leading-relaxed">É rapidinho: entre com sua conta Google. Assim você acompanha e cancela seus horários quando precisar.</p>
         <button onClick={onLogin} className="btn-primary"><GoogleG /> Entrar com Google</button>
       </div>
     )
@@ -108,18 +102,8 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
         <Link to="/admin/agenda" className="text-blush-700 underline underline-offset-4">agenda do painel</Link>.
       </div>
     )
-  } else if (reserva?.status === 'confirmado') {
-    conteudo = <Confirmado ag={reserva} config={config} onNovo={() => setReservaId(null)} />
-  } else if (reserva?.status === 'aguardando_sinal') {
-    conteudo = (
-      <PagamentoSinal
-        ag={reserva}
-        config={config}
-        onVoltar={() => { descartarReserva(reserva.id); setReservaId(null) }}
-        onExpirou={() => { descartarReserva(reserva.id); setReservaId(null); setErro('O tempo para pagar o sinal acabou e o horário foi liberado. Escolha de novo.') }}
-        onPago={() => confirmarSinal(reserva.id, 'pix')}
-      />
-    )
+  } else if (confirmado) {
+    conteudo = <Confirmado ag={confirmado} config={config} onNovo={() => setConfirmadoId(null)} />
   } else if (pendenciasAbertasDe(db, usuario.id).length > 0) {
     const pend = pendenciasAbertasDe(db, usuario.id)
     const devido = pend.reduce((s, m) => s + m.valor, 0)
@@ -145,73 +129,51 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
       </div>
     )
   } else {
+    const livres = data ? slots.filter((h) => slotLivre(config, h, duracao, ocupados, data)) : []
     conteudo = (
-      <div className="grid lg:grid-cols-[1fr_360px] gap-10">
-        <div className="space-y-10 min-w-0">
-          <Passo n={1} titulo="Escolha o(s) serviço(s)">
-            <div className="space-y-4">
-              {CATEGORIAS.map(([cat, nomeCat]) => (
-                <div key={cat}>
-                  <p className="text-xs text-cacau-500 mb-2">{nomeCat}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {servicos.filter((s) => s.categoria === cat).map((s) => {
-                      const on = selecionados.includes(s.id)
-                      return (
-                        <button
-                          key={s.id}
-                          onClick={() => toggle(s.id)}
-                          className={`flex items-center gap-2 px-4 py-2.5 rounded-full border text-sm transition-all cursor-pointer ${on ? 'bg-cacau-900 border-cacau-900 text-nude-50' : 'bg-white border-nude-300 text-cacau-800 hover:border-blush-500'}`}
-                        >
-                          {on && <Check size={14} />}
-                          {s.nome}
-                          <span className={on ? 'text-nude-300' : 'text-cacau-500'}>· {brl(s.preco)}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
+      <div className="grid lg:grid-cols-[1fr_340px] gap-8 lg:gap-10 items-start">
+        <div className="space-y-8 min-w-0">
+          <Passo n={1} titulo="Serviços">
+            <SeletorServicos key={servicoInicial?.t || 0} servicos={servicos} sel={selecionados} onChange={escolher} />
           </Passo>
 
-          <Passo n={2} titulo="Escolha o dia" ativo={itens.length > 0}>
-            <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-thin -mx-1 px-1">
-              {dias.map((iso) => {
-                const lotado =
-                  diaAberto(config, iso) &&
-                  !slots.some((h) => slotLivre(config, h, duracao || config.slotMin, intervalosOcupados(db.agendamentos, iso), iso))
-                const fechado = !diaAberto(config, iso) || diaFechado(iso) || lotado
-                const d = fromISO(iso)
-                const on = data === iso
-                return (
-                  <button
-                    key={iso}
-                    disabled={fechado}
-                    title={lotado ? 'Sem horários livres' : undefined}
-                    onClick={() => { setData(iso); setHora(null) }}
-                    className={`shrink-0 w-16 py-3 rounded-2xl border flex flex-col items-center gap-0.5 transition-all cursor-pointer disabled:cursor-not-allowed ${
-                      on ? 'bg-cacau-900 border-cacau-900 text-nude-50' : fechado ? 'border-nude-200 text-nude-400 line-through' : 'bg-white border-nude-300 text-cacau-800 hover:border-blush-500'
-                    }`}
-                  >
-                    <span className="font-label text-[11px] uppercase tracking-wider">{DIAS_CURTOS[d.getDay()]}</span>
-                    <span className="font-display text-2xl font-semibold leading-none">{d.getDate()}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </Passo>
+          {/* Os próximos passos só aparecem quando o anterior foi respondido */}
+          {itens.length > 0 && (
+            <Passo n={2} titulo="Dia">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin -mx-1 px-1">
+                {dias.map((iso) => {
+                  const lotado =
+                    diaAberto(config, iso) &&
+                    !slots.some((h) => slotLivre(config, h, duracao, intervalosOcupados(db.agendamentos, iso), iso))
+                  const fechado = !diaAberto(config, iso) || diaFechado(iso) || lotado
+                  const d = fromISO(iso)
+                  const on = data === iso
+                  return (
+                    <button
+                      key={iso}
+                      disabled={fechado}
+                      title={lotado ? 'Sem horários livres' : undefined}
+                      onClick={() => { setData(iso); setHora(null) }}
+                      className={`shrink-0 w-14 py-2.5 rounded-2xl border flex flex-col items-center transition-all cursor-pointer disabled:cursor-not-allowed ${
+                        on ? 'bg-cacau-900 border-cacau-900 text-nude-50' : fechado ? 'border-transparent text-nude-400' : 'bg-white border-nude-300 text-cacau-800 hover:border-blush-500'
+                      }`}
+                    >
+                      <span className="text-[10px] uppercase tracking-wider">{DIAS_CURTOS[d.getDay()]}</span>
+                      <span className="font-display text-xl font-semibold leading-tight">{d.getDate()}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </Passo>
+          )}
 
-          <Passo n={3} titulo="Escolha o horário" ativo={!!data}>
-            {data && (() => {
-              const livres = slots.filter((h) => slotLivre(config, h, duracao, ocupados, data))
-              if (!livres.length)
-                return (
-                  <div className="flex items-center gap-3 text-cacau-500 py-4">
-                    <CalendarX2 size={20} /> Sem horários livres para a duração escolhida ({duracaoLabel(duracao)}) neste dia.
-                  </div>
-                )
-              return (
+          {itens.length > 0 && data && (
+            <Passo n={3} titulo="Horário">
+              {livres.length === 0 ? (
+                <p className="flex items-center gap-2 text-sm text-cacau-500"><CalendarX2 size={18} /> Nenhum horário com {duracaoLabel(duracao)} livres neste dia. Tente outro.</p>
+              ) : (
                 <>
+                  {/* Grade do dia inteiro: só dá para começar onde o serviço inteiro cabe */}
                   <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 gap-2">
                     {slots.map((h) => {
                       const livre = livres.includes(h)
@@ -223,14 +185,14 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
                           key={h}
                           disabled={!livre || coberto}
                           onClick={() => setHora(h)}
-                          className={`py-2.5 rounded-xl border font-label text-sm tracking-wider transition-all cursor-pointer disabled:cursor-not-allowed ${
+                          className={`py-2 rounded-xl border text-sm tabular-nums transition-all cursor-pointer disabled:cursor-not-allowed ${
                             on
                               ? 'bg-cacau-900 border-cacau-900 text-nude-50'
                               : coberto
                                 ? 'bg-blush-100 border-blush-300 text-blush-700'
                                 : livre
                                   ? 'bg-white border-nude-300 text-cacau-800 hover:border-blush-500'
-                                  : 'border-nude-200 text-nude-400 line-through'
+                                  : 'border-transparent text-nude-400 line-through'
                           }`}
                         >
                           {h}
@@ -238,64 +200,70 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
                       )
                     })}
                   </div>
-                  {hora && (
-                    <p className="text-sm text-cacau-600 mt-4 flex items-center gap-2">
-                      <Clock size={14} className="text-blush-600" />
-                      Seu atendimento: <strong className="text-cacau-900">{hora} às {fromMin(toMin(hora) + duracao)}</strong> ({duracaoLabel(duracao)})
+                  {hora ? (
+                    <p className="text-sm text-cacau-600 mt-3 flex items-center gap-2">
+                      <Clock size={14} className="text-blush-600 shrink-0" />
+                      Seu atendimento: <strong className="text-cacau-900 font-medium">{hora} às {fromMin(toMin(hora) + duracao)}</strong> ({duracaoLabel(duracao)})
+                    </p>
+                  ) : (
+                    <p className="text-xs text-cacau-500 mt-3">
+                      Escolha o horário de início. Os riscados estão ocupados ou não têm tempo para os {duracaoLabel(duracao)} do serviço.
                     </p>
                   )}
                 </>
-              )
-            })()}
-            {!data && <p className="text-cacau-500 text-sm">Selecione um dia primeiro.</p>}
-          </Passo>
+              )}
+            </Passo>
+          )}
         </div>
 
         {/* Resumo */}
-        <aside className="lg:sticky lg:top-28 h-fit bg-white border border-nude-200 rounded-3xl p-6 shadow-xl shadow-blush-700/5">
-          <h3 className="font-label uppercase tracking-[0.2em] text-blush-600 text-sm mb-5">Resumo</h3>
+        <aside className="lg:sticky lg:top-28 bg-white border border-nude-200 rounded-3xl p-6 shadow-xl shadow-blush-700/5">
+          <h3 className="font-display text-2xl font-semibold text-cacau-900 mb-4">Seu horário</h3>
           {itens.length === 0 ? (
-            <p className="text-cacau-500 text-sm mb-4">Nenhum serviço selecionado.</p>
+            <p className="text-sm text-cacau-500">Escolha um serviço para começar.</p>
           ) : (
-            <ul className="space-y-2 mb-4">
-              {itens.map((i) => (
-                <li key={i.id} className="flex justify-between text-sm">
-                  <span className="text-cacau-800">{i.nome}</span>
-                  <span className="text-cacau-600">{brl(i.preco)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="border-t border-dashed border-nude-300 pt-4 space-y-2 text-sm">
-            <div className="flex justify-between text-cacau-500"><span className="flex items-center gap-1.5"><Clock size={14} /> Duração</span><span>{duracao ? duracaoLabel(duracao) : '—'}</span></div>
-            <div className="flex justify-between text-cacau-500"><span>Quando</span><span className="text-cacau-800">{data ? `${dataCurta(data)}${hora ? ` · ${hora}` : ''}` : '—'}</span></div>
-            <div className="flex justify-between text-cacau-500"><span>Total</span><span className="text-cacau-800">{brl(total)}</span></div>
-          </div>
-          <div className="mt-4 bg-blush-100/70 rounded-2xl px-4 py-3">
-            <div className="flex justify-between items-baseline">
-              <span className="text-sm text-blush-700 font-medium">Sinal ({config.sinalPct}%)</span>
-              <span className="font-display text-3xl font-semibold text-cacau-900">{brl(sinal - creditoUsado)}</span>
-            </div>
-            {creditoUsado > 0 && (
-              <div className="flex justify-between text-xs text-emerald-700 mt-1">
-                <span className="flex items-center gap-1"><Wallet size={12} /> Seu crédito abatido</span>
-                <span>− {brl(creditoUsado)}</span>
+            <>
+              {/* Itens separados por parte, na mesma ordem do lado esquerdo */}
+              <ul className="space-y-3">
+                {[['cilios', 'Cílios'], ['sobrancelhas', 'Sobrancelhas']].map(([parte, rotulo]) => {
+                  const it = itens.find((i) => parteDe(servicos, i.vid) === parte)
+                  if (!it) return null
+                  return (
+                    <li key={parte}>
+                      <div className="text-[10px] font-label uppercase tracking-[0.2em] text-blush-600">{rotulo}</div>
+                      <div className="flex items-center gap-2 text-sm mt-0.5">
+                        <span className="flex-1 text-cacau-800">{it.nome}</span>
+                        <span className="text-cacau-600 tabular-nums whitespace-nowrap">{brl(it.preco)}</span>
+                        <button onClick={() => escolher(selecionados.filter((v) => v !== it.vid))} className="p-1 -mr-1 rounded-full text-cacau-500 hover:text-red-600 hover:bg-red-50 cursor-pointer" aria-label={`Remover ${it.nome}`}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+              <div className="flex items-center gap-2 text-sm text-cacau-600 mt-3">
+                <Clock size={14} className="text-blush-600 shrink-0" />
+                {data ? `${dataCurta(data)}${hora ? `, ${hora} às ${fromMin(toMin(hora) + duracao)}` : ' · escolha o horário'}` : `${duracaoLabel(duracao)} · escolha o dia`}
               </div>
-            )}
-            <div className="flex justify-between text-xs text-cacau-500 mt-1">
-              <span>Restante no dia</span>
-              <span>{brl(total - sinal)}</span>
-            </div>
-          </div>
+              <div className="flex justify-between items-baseline border-t border-dashed border-nude-300 mt-4 pt-4">
+                <span className="text-sm text-cacau-600">Total no dia</span>
+                <span className="font-display text-3xl font-semibold text-cacau-900">{brl(total)}</span>
+              </div>
+            </>
+          )}
 
-          <p className="text-xs text-cacau-500 mt-5">Agendando como <strong className="text-cacau-800">{usuario.nome}</strong></p>
-          <label className="label mt-3">WhatsApp <span className="text-blush-600">*</span></label>
-          <input className="input" type="tel" value={telefone} onChange={(e) => setTelefone(telefoneMask(e.target.value))} placeholder="(31) 99999-9999" />
+          {hora && (
+            <div className="mt-5 animate-fade-up">
+              <label className="label">Seu WhatsApp</label>
+              <input className="input" type="tel" value={telefone} onChange={(e) => setTelefone(telefoneMask(e.target.value))} placeholder="(31) 99999-9999" />
+            </div>
+          )}
           {erro && <p className="flex items-center gap-2 text-sm text-red-600 mt-3"><AlertCircle size={15} className="shrink-0" /> {erro}</p>}
-          <button onClick={irParaPagamento} disabled={!itens.length || !data || !hora} className="btn-primary w-full mt-5">
-            {itens.length && sinal - creditoUsado <= 0 ? <><Check size={16} /> Reservar com meu crédito</> : <><QrCode size={16} /> Pagar sinal e reservar</>}
-          </button>
-          <p className="text-[11px] text-cacau-500 mt-3 leading-relaxed text-center">O horário só é confirmado após o pagamento do sinal.</p>
+          <button onClick={confirmar} disabled={!itens.length || !data || !hora} className="btn-primary w-full mt-5">Confirmar</button>
+          <p className="text-[11px] text-cacau-500 mt-3 text-center">
+            Paga no dia · cancele grátis até {config.antecedenciaCancelHoras}h antes · falta gera multa de {config.multaPct}%
+          </p>
         </aside>
       </div>
     )
@@ -311,104 +279,23 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
   )
 }
 
-// ---------------------------------------------------------------------------
-// Pix do sinal. No esboço o pagamento é simulado; em produção a cobrança vem
-// de um provedor (Mercado Pago/Asaas/Efí) com webhook confirmando sozinho.
-// ---------------------------------------------------------------------------
-function PagamentoSinal({ ag, config, onVoltar, onExpirou, onPago }) {
-  const [agora, setAgora] = useState(Date.now())
-  const [copiado, setCopiado] = useState(false)
-  const restante = Math.max(0, ag.expiraEm - agora)
-  const aPagar = ag.sinal.valor - (ag.sinal.creditoUsado || 0)
-
-  useEffect(() => {
-    const t = setInterval(() => setAgora(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [])
-  useEffect(() => {
-    if (restante === 0) onExpirou()
-  }, [restante, onExpirou])
-
-  const codigo = gerarPix({ chave: config.pixChave, nome: config.pixNome, cidade: config.pixCidade, valor: aPagar, txid: `SINAL${ag.id}` })
-  const copiar = async () => {
-    try {
-      await navigator.clipboard.writeText(codigo)
-      setCopiado(true)
-      setTimeout(() => setCopiado(false), 2000)
-    } catch {
-      /* navegador sem permissão de clipboard */
-    }
-  }
-  const min = Math.floor(restante / 60000)
-  const seg = Math.floor((restante % 60000) / 1000)
-
-  return (
-    <div className="max-w-4xl mx-auto grid md:grid-cols-[320px_minmax(0,1fr)] bg-white border border-nude-200 rounded-3xl overflow-hidden shadow-xl shadow-blush-700/5 animate-fade-up">
-      <div className="bg-cacau-900 text-nude-100 p-7 flex flex-col">
-        <button onClick={onVoltar} className="self-start flex items-center gap-1.5 text-xs text-nude-300 hover:text-nude-50 cursor-pointer mb-6">
-          <ArrowLeft size={14} /> Trocar horário
-        </button>
-        <p className="font-label uppercase tracking-[0.3em] text-[11px] text-blush-300">Sua reserva</p>
-        <p className="font-display text-3xl text-nude-50 mt-2 leading-tight">{ag.servicoNomes}</p>
-        <p className="text-sm text-nude-300 mt-2">{dataLonga(ag.data)} · {ag.hora} às {fromMin(toMin(ag.hora) + ag.duracao)}</p>
-        <div className="mt-auto pt-8 space-y-2 text-sm">
-          <div className="flex justify-between text-nude-300"><span>Total do serviço</span><span>{brl(ag.total)}</span></div>
-          <div className="flex justify-between text-nude-300"><span>Restante no dia</span><span>{brl(ag.total - ag.sinal.valor)}</span></div>
-          {ag.sinal.creditoUsado > 0 && <div className="flex justify-between text-emerald-300"><span>Crédito abatido</span><span>− {brl(ag.sinal.creditoUsado)}</span></div>}
-          <div className="flex justify-between items-baseline border-t border-cacau-700 pt-3">
-            <span className="text-nude-50">Sinal a pagar</span>
-            <span className="font-display text-4xl font-semibold text-blush-300">{brl(aPagar)}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-7 text-center min-w-0">
-        <div className={`flex w-fit mx-auto items-center gap-2 rounded-full px-4 py-1.5 text-sm mb-5 ${min < 3 ? 'bg-red-50 text-red-700' : 'bg-blush-100 text-blush-700'}`}>
-          <Timer size={15} /> Horário segurado por <strong className="tabular-nums">{pad(min)}:{pad(seg)}</strong>
-        </div>
-        <div className="bg-white p-3 rounded-2xl border border-nude-200 w-fit mx-auto mb-4">
-          <QRCodeSVG value={codigo} size={184} level="M" fgColor="#2a201d" />
-        </div>
-        <p className="text-xs text-cacau-500 mb-2">Abra o app do banco → Pix → Ler QR Code, ou use o copia e cola:</p>
-        <div className="flex gap-2 mb-5 min-w-0">
-          <div className="flex-1 min-w-0 bg-nude-50 border border-nude-300 rounded-xl px-3 py-2.5 text-xs font-mono text-cacau-600 truncate select-all text-left">{codigo}</div>
-          <button onClick={copiar} className="btn-primary !px-4 !py-2 shrink-0 !text-[11px] !tracking-wider" title="Copiar">
-            {copiado ? <><Check size={15} /> Copiado</> : <><Copy size={15} /> Copiar</>}
-          </button>
-        </div>
-        <div className="flex items-center justify-center gap-2 text-sm text-cacau-600 mb-5">
-          <Loader2 size={16} className="animate-spin text-blush-600" /> Aguardando pagamento...
-        </div>
-        <div className="border-t border-nude-200 pt-4">
-          <button onClick={onPago} className="text-xs text-blush-700 hover:text-blush-600 underline underline-offset-4 cursor-pointer">
-            [Esboço] Simular pagamento confirmado
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function Confirmado({ ag, config, onNovo }) {
-  const msg = encodeURIComponent(
-    `Oi, Ana! Acabei de reservar pelo site:\n${ag.servicoNomes}\n${dataLonga(ag.data)} às ${ag.hora}\nSinal pago: ${brl(ag.sinal.valor)}\nNome: ${ag.clienteNome}`
-  )
+  const msg = encodeURIComponent(`Oi, Ana! Acabei de agendar pelo site:\n${ag.servicoNomes}\n${dataLonga(ag.data)} às ${ag.hora}\nNome: ${ag.clienteNome}`)
   return (
     <div className="text-center py-6 max-w-md mx-auto animate-fade-up">
       <div className="h-16 w-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-5">
         <CalendarCheck2 className="text-emerald-600" size={30} />
       </div>
       <h3 className="font-display text-4xl text-cacau-900 font-semibold mb-2">Horário confirmado!</h3>
-      <p className="text-cacau-600 mb-6">Obrigada, {primeiroNome(ag.clienteNome)}! {ag.sinal.via === 'credito' ? 'Seu crédito cobriu o sinal.' : 'Recebemos o seu sinal.'}</p>
+      <p className="text-cacau-600 mb-6">Obrigada, {primeiroNome(ag.clienteNome)}! Te espero no dia e horário abaixo.</p>
       <div className="bg-white border border-nude-200 rounded-2xl p-5 text-left space-y-2 mb-6">
         <Linha k="Serviço" v={ag.servicoNomes} />
         <Linha k="Data" v={dataLonga(ag.data)} />
         <Linha k="Horário" v={`${ag.hora} às ${fromMin(toMin(ag.hora) + ag.duracao)}`} />
-        <Linha k="Sinal pago" v={`${brl(ag.sinal.valor)}${ag.sinal.creditoUsado ? ` (${brl(ag.sinal.creditoUsado)} em crédito)` : ''}`} />
-        <Linha k="A pagar no dia" v={brl(ag.total - ag.sinal.valor)} forte />
+        <Linha k="Valor (pago no dia)" v={brl(ag.total)} forte />
       </div>
       <p className="text-xs text-cacau-500 mb-6">
-        Venha sem maquiagem nos olhos. Precisa remarcar? Cancele em "Meus horários" com {config.remarcarHoras}h de antecedência e o sinal vira crédito.
+        Venha sem maquiagem nos olhos. Precisa desmarcar? Cancele em "Meus horários" até {config.antecedenciaCancelHoras}h antes. Faltas sem aviso geram multa de {config.multaPct}%.
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <a href={`https://wa.me/${config.whatsapp}?text=${msg}`} target="_blank" rel="noreferrer" className="btn !bg-[#25D366] text-white hover:!brightness-95"><WhatsApp size={16} /> Avisar a Ana</a>

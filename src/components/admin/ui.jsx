@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, Clock3, Ban, Lock, Inbox, Hourglass, CalendarCheck } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock3, Ban, Lock, Inbox, CalendarCheck } from 'lucide-react'
 import { iniciais } from '../../lib/format'
 
 export function Cabecalho({ titulo, sub, children }) {
@@ -47,8 +47,7 @@ export function Kpi({ icone: Icone, rotulo, valor, detalhe, tom = 'neutro' }) {
 }
 
 export const STATUS = {
-  aguardando_sinal: { txt: 'Aguardando sinal', icone: Hourglass, cls: 'text-amber-800 bg-amber-50 border-amber-200', barra: 'bg-amber-400' },
-  confirmado: { txt: 'Confirmado', icone: CalendarCheck, cls: 'text-violet-800 bg-violet-50 border-violet-200', barra: 'bg-violet-400' },
+  agendado: { txt: 'Agendado', icone: CalendarCheck, cls: 'text-violet-800 bg-violet-50 border-violet-200', barra: 'bg-violet-400' },
   concluido: { txt: 'Concluído', icone: CheckCircle2, cls: 'text-emerald-800 bg-emerald-50 border-emerald-200', barra: 'bg-emerald-400' },
   cancelado: { txt: 'Cancelado', icone: Ban, cls: 'text-cacau-600 bg-nude-100 border-nude-300', barra: 'bg-nude-300' },
   falta: { txt: 'Faltou', icone: XCircle, cls: 'text-red-700 bg-red-50 border-red-200', barra: 'bg-red-400' },
@@ -59,7 +58,7 @@ export const STATUS = {
 }
 
 export function Status({ s }) {
-  const st = STATUS[s] || STATUS.confirmado
+  const st = STATUS[s] || STATUS.agendado
   const Icone = st.icone
   return (
     <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${st.cls}`}>

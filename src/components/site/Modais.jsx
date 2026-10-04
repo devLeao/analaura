@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Copy, Check, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, UserPlus, Crown, QrCode, Wallet, CalendarX2 } from 'lucide-react'
+import { Copy, Check, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, UserPlus, Crown, QrCode, CalendarX2 } from 'lucide-react'
 import Modal from '../ui/Modal'
 import { useStore, pendenciasAbertasDe } from '../../store/Store'
 import { brl, dataCurta, dataLonga, iniciais } from '../../lib/format'
@@ -37,9 +37,9 @@ export function LoginModal({ aberto, onFechar }) {
       </div>
       {!novo ? (
         <div className="space-y-1">
-          {demo && <Conta onClick={() => entrarComoCliente(demo.id)} avatar={iniciais(demo.nome)} titulo={demo.nome} sub={`${demo.email} · tem crédito e histórico`} />}
+          {demo && <Conta onClick={() => entrarComoCliente(demo.id)} avatar={iniciais(demo.nome)} titulo={demo.nome} sub={`${demo.email} · tem histórico, manutenção vencendo`} />}
           {devedora && (
-            <Conta onClick={() => entrarComoCliente(devedora.id)} avatar={iniciais(devedora.nome)} titulo={devedora.nome} sub={`${devedora.email} · tem pendência em aberto`} destaque="bg-amber-50 text-amber-800" />
+            <Conta onClick={() => entrarComoCliente(devedora.id)} avatar={iniciais(devedora.nome)} titulo={devedora.nome} sub={`${devedora.email} · tem multa por falta`} destaque="bg-amber-50 text-amber-800" />
           )}
           <Conta onClick={entrarComoAdmin} avatar={<Crown size={16} />} titulo="Ana Laura (administradora)" sub="Acesso ao painel" destaque="bg-cacau-900 text-blush-200" />
           <button onClick={() => setNovo(true)} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-nude-100 text-left text-cacau-600 text-sm cursor-pointer">
@@ -85,7 +85,7 @@ export function PagarPendenciasModal({ pendencias, onFechar }) {
   const fechar = () => { setPago(false); onFechar() }
 
   return (
-    <Modal aberto onFechar={fechar} titulo={pago ? 'Pagamento confirmado' : 'Pagar pendência'}>
+    <Modal aberto onFechar={fechar} titulo={pago ? 'Pagamento confirmado' : 'Pagar multa / pendência'}>
       {pago ? (
         <div className="text-center py-4 animate-fade-up">
           <CheckCircle2 size={56} className="text-emerald-600 mx-auto mb-4" />
@@ -125,8 +125,7 @@ export function PagarPendenciasModal({ pendencias, onFechar }) {
 // Meus horários (área da cliente)
 // ---------------------------------------------------------------------------
 const STATUS_INFO = {
-  aguardando_sinal: ['Aguardando sinal', 'text-amber-800 border-amber-200 bg-amber-50'],
-  confirmado: ['Confirmado', 'text-violet-800 border-violet-200 bg-violet-50'],
+  agendado: ['Agendado', 'text-violet-800 border-violet-200 bg-violet-50'],
   concluido: ['Concluído', 'text-emerald-800 border-emerald-200 bg-emerald-50'],
   cancelado: ['Cancelado', 'text-cacau-600 border-nude-300 bg-nude-100'],
   falta: ['Falta', 'text-red-700 border-red-200 bg-red-50'],
@@ -139,13 +138,10 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
 
   const { config } = db
   const meus = db.agendamentos.filter((a) => a.clienteId === usuario.id)
-  const futuros = meus
-    .filter((a) => ['confirmado', 'aguardando_sinal'].includes(a.status) && minutosAte(a) > -60)
-    .sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora))
-  const historico = meus.filter((a) => !futuros.includes(a) && a.status !== 'aguardando_sinal').sort((a, b) => (b.data + b.hora).localeCompare(a.data + a.hora)).slice(0, 8)
+  const futuros = meus.filter((a) => a.status === 'agendado' && minutosAte(a) > -60).sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora))
+  const historico = meus.filter((a) => !futuros.includes(a)).sort((a, b) => (b.data + b.hora).localeCompare(a.data + a.hora)).slice(0, 8)
   const pendencias = pendenciasAbertasDe(db, usuario.id)
-  const limite = config.remarcarHoras * 60
-  const comAntecedencia = confirmar && minutosAte(confirmar) > limite
+  const limite = config.antecedenciaCancelHoras * 60
 
   return (
     <Modal aberto onFechar={onFechar} titulo="Meus horários" sub={`Olá, ${usuario.nome.split(' ')[0]}!`} largura="max-w-lg">
@@ -159,14 +155,6 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
           </div>
         </div>
       )}
-      {usuario.credito > 0 && (
-        <div className="mb-5 border border-emerald-200 bg-emerald-50 rounded-2xl p-4 flex gap-3 items-center">
-          <Wallet className="text-emerald-700 shrink-0" size={20} />
-          <p className="text-sm text-cacau-800">
-            Você tem <strong className="text-emerald-800">{brl(usuario.credito)}</strong> de crédito. Ele é usado automaticamente no sinal do próximo agendamento.
-          </p>
-        </div>
-      )}
 
       <h4 className="font-label uppercase tracking-[0.2em] text-xs text-blush-600 mb-3">Próximos</h4>
       {futuros.length === 0 ? (
@@ -174,7 +162,7 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
       ) : (
         <ul className="space-y-2 mb-6">
           {futuros.map((a) => {
-            const [txt, cls] = STATUS_INFO[a.status]
+            const podeCancelar = minutosAte(a) > limite
             return (
               <li key={a.id} className="bg-nude-50 border border-nude-200 rounded-2xl p-4 flex items-center gap-4">
                 <div className="text-center w-12 shrink-0">
@@ -182,15 +170,18 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
                   <div className="font-label text-[11px] uppercase text-cacau-500">{dataCurta(a.data).split(' ')[1]}</div>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-cacau-900 font-medium truncate">{a.servicoNomes}</div>
-                  <div className="text-xs text-cacau-500 flex items-center gap-2 flex-wrap mt-0.5">
-                    {a.hora} · sinal {a.sinal.pago ? `pago (${brl(a.sinal.valor)})` : 'pendente'}
-                    <span className={`text-[10px] px-1.5 py-px rounded-full border ${cls}`}>{txt}</span>
-                  </div>
+                  <div className="text-cacau-900 font-medium">{a.servicoNomes}</div>
+                  <div className="text-xs text-cacau-500 mt-0.5">{a.hora} · {brl(a.total)} no dia</div>
                 </div>
-                <button onClick={() => setConfirmar(a)} className="p-2 text-cacau-500 hover:text-red-600 hover:bg-red-50 rounded-full cursor-pointer" title="Cancelar horário">
-                  <CalendarX2 size={18} />
-                </button>
+                {podeCancelar ? (
+                  <button onClick={() => setConfirmar(a)} className="p-2 text-cacau-500 hover:text-red-600 hover:bg-red-50 rounded-full cursor-pointer" title="Cancelar horário">
+                    <CalendarX2 size={18} />
+                  </button>
+                ) : (
+                  <span className="text-[10px] font-label uppercase tracking-wider text-amber-700 text-right leading-tight" title={`Menos de ${config.antecedenciaCancelHoras}h para o horário. Fale com a Ana pelo WhatsApp.`}>
+                    Fale com<br />a Ana
+                  </span>
+                )}
               </li>
             )
           })}
@@ -203,7 +194,7 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
       ) : (
         <ul className="divide-y divide-nude-200">
           {historico.map((a) => {
-            const [txt, cls] = STATUS_INFO[a.status] || STATUS_INFO.confirmado
+            const [txt, cls] = STATUS_INFO[a.status] || STATUS_INFO.agendado
             return (
               <li key={a.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
                 <div className="min-w-0">
@@ -218,7 +209,7 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
       )}
 
       <p className="flex items-start gap-2 text-[11px] text-cacau-500 mt-6">
-        <ShieldCheck size={14} className="shrink-0 mt-px" /> Cancelando com {config.remarcarHoras}h de antecedência, o sinal vira crédito. Em cima da hora ou falta, o sinal fica retido.
+        <ShieldCheck size={14} className="shrink-0 mt-px" /> Cancelamento grátis até {config.antecedenciaCancelHoras}h antes. Faltas sem aviso geram multa de {config.multaPct}%.
       </p>
 
       <Modal
@@ -229,11 +220,7 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
           <>
             <button onClick={() => setConfirmar(null)} className="btn-ghost !py-2.5 !px-5 !text-xs">Voltar</button>
             <button
-              onClick={() => {
-                cancelarAgendamento(confirmar.id, comAntecedencia ? 'credito' : 'retido', true)
-                setConfirmar(null)
-                avisar(confirmar.sinal.pago && comAntecedencia ? `Horário cancelado. ${brl(confirmar.sinal.valor)} viraram crédito.` : 'Horário cancelado.')
-              }}
+              onClick={() => { cancelarAgendamento(confirmar.id, true); setConfirmar(null); avisar('Horário cancelado.') }}
               className="btn !py-2.5 !px-5 !text-xs bg-red-600 text-white hover:bg-red-700"
             >
               Sim, cancelar
@@ -242,20 +229,9 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
         }
       >
         {confirmar && (
-          <div className="text-sm text-cacau-600 space-y-3">
-            <p>{confirmar.servicoNomes} em {dataLonga(confirmar.data)} às {confirmar.hora}.</p>
-            {!confirmar.sinal.pago ? (
-              <p>O sinal ainda não foi pago, então nada é cobrado.</p>
-            ) : comAntecedencia ? (
-              <p className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl px-3 py-2">
-                Faltam mais de {config.remarcarHoras}h: o sinal de <strong>{brl(confirmar.sinal.valor)}</strong> vira crédito para o próximo agendamento.
-              </p>
-            ) : (
-              <p className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-3 py-2">
-                Faltam menos de {config.remarcarHoras}h: pela política do estúdio, o sinal de <strong>{brl(confirmar.sinal.valor)}</strong> não é devolvido.
-              </p>
-            )}
-          </div>
+          <p className="text-sm text-cacau-600">
+            {confirmar.servicoNomes} em {dataLonga(confirmar.data)} às {confirmar.hora}. Como faltam mais de {config.antecedenciaCancelHoras}h, não há nenhuma cobrança e o horário fica livre para outra cliente.
+          </p>
         )}
       </Modal>
     </Modal>

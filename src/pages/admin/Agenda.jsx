@@ -6,7 +6,7 @@ import { AgendamentoCard, useAcoesAgendamento } from '../../components/admin/Age
 import ModalEncaixe from '../../components/admin/ModalEncaixe'
 import Modal from '../../components/ui/Modal'
 import { brl, toISO, fromISO, addDays, DIAS_CURTOS, dataLonga, toMin, fromMin, duracaoLabel } from '../../lib/format'
-import { gerarSlots, diaAberto, intervalosOcupados, slotLivre, ocupaAgenda, reservaExpirada } from '../../lib/schedule'
+import { gerarSlots, diaAberto, intervalosOcupados, slotLivre, ocupaAgenda } from '../../lib/schedule'
 
 /** Trechos livres do expediente (já descontando almoço e horários ocupados). */
 function trechosLivres(config, ocupados) {
@@ -36,14 +36,14 @@ export default function Agenda() {
   const [fecharDia, setFecharDia] = useState(false)
   const [verCancelados, setVerCancelados] = useState(false)
 
-  const doDia = db.agendamentos.filter((a) => a.data === data && !reservaExpirada(a))
+  const doDia = db.agendamentos.filter((a) => a.data === data)
   const ativos = doDia.filter((a) => a.status !== 'cancelado')
   const cancelados = doDia.filter((a) => a.status === 'cancelado')
   const diaFechado = doDia.some((a) => a.status === 'bloqueio' && a.diaInteiro)
   const aberto = diaAberto(config, data)
   const clientes = ativos.filter((a) => !['bloqueio', 'falta'].includes(a.status))
   const previsto = clientes.reduce((s, a) => s + a.total, 0)
-  const sinais = clientes.filter((a) => a.sinal?.pago).reduce((s, a) => s + a.sinal.valor, 0)
+  const recebido = clientes.filter((a) => a.status === 'concluido').reduce((s, a) => s + a.total, 0)
 
   // Linha do tempo: atendimentos + trechos livres + almoço
   const linhas = useMemo(() => {
@@ -79,7 +79,6 @@ export default function Agenda() {
           {semana.map((iso) => {
             const d = fromISO(iso)
             const doIso = db.agendamentos.filter((a) => a.data === iso && ocupaAgenda(a) && a.status !== 'bloqueio')
-            const temSinal = doIso.some((a) => a.status === 'aguardando_sinal')
             const sel = iso === data
             const fechado = !diaAberto(config, iso)
             return (
@@ -92,7 +91,6 @@ export default function Agenda() {
                 <span className={`text-base sm:text-lg font-semibold ${iso === hoje && !sel ? 'text-blush-700' : ''}`}>{d.getDate()}</span>
                 <span className="h-3 flex items-center gap-0.5">
                   {doIso.slice(0, 5).map((a) => <span key={a.id} className={`h-1.5 w-1.5 rounded-full ${sel ? 'bg-blush-300' : STATUS[a.status]?.barra || 'bg-nude-300'}`} />)}
-                  {temSinal && !sel && <span className="sr-only">tem sinal pendente</span>}
                 </span>
               </button>
             )
@@ -109,7 +107,7 @@ export default function Agenda() {
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-4 px-1">
         <span className="text-cacau-500">Clientes: <strong className="text-cacau-900 font-semibold">{clientes.length}</strong></span>
         <span className="text-cacau-500">Previsto: <strong className="text-cacau-900 font-semibold">{brl(previsto)}</strong></span>
-        <span className="text-cacau-500">Sinais recebidos: <strong className="text-cacau-900 font-semibold">{brl(sinais)}</strong></span>
+        <span className="text-cacau-500">Recebido: <strong className="text-cacau-900 font-semibold">{brl(recebido)}</strong></span>
         {aberto && !diaFechado && <span className="text-cacau-500">Tempo livre: <strong className="text-cacau-900 font-semibold">{duracaoLabel(minLivres)}</strong></span>}
       </div>
       <Legenda />
@@ -175,7 +173,7 @@ export default function Agenda() {
 function Legenda() {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-cacau-500 mb-4 px-1">
-      {['confirmado', 'aguardando_sinal', 'concluido', 'falta'].map((s) => (
+      {['agendado', 'concluido', 'falta'].map((s) => (
         <span key={s} className="flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${STATUS[s].barra}`} />{STATUS[s].txt}</span>
       ))}
     </div>

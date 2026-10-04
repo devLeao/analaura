@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarCheck, HandCoins, Wallet, Gauge, ArrowRight, Hourglass, AlertTriangle, Sparkles, Cake, CheckCircle2, CalendarPlus } from 'lucide-react'
+import { CalendarCheck, HandCoins, Wallet, Gauge, ArrowRight, BellRing, AlertTriangle, Sparkles, Cake, CheckCircle2, CalendarPlus } from 'lucide-react'
 import { useStore } from '../../store/Store'
 import { Cabecalho, Kpi, Vazio, Botao, Avatar } from '../../components/admin/ui'
 import { AgendamentoCard, useAcoesAgendamento, linkWhats, mensagens } from '../../components/admin/AgendamentoCard'
@@ -8,9 +8,9 @@ import { CardGrafico, GraficoColunas } from '../../components/admin/Graficos'
 import ModalEncaixe from '../../components/admin/ModalEncaixe'
 import FichaCliente from '../../components/admin/FichaCliente'
 import { WhatsApp } from '../../components/ui/Icones'
-import { calcularStats, movimentacoes, manutencaoVencendo, aniversariantes } from '../../lib/stats'
+import { calcularStats, variacao, manutencaoVencendo, aniversariantes } from '../../lib/stats'
 import { brl, toISO, addDays, DIAS_CURTOS, fromISO, dataCurta, toMin, primeiroNome, dataLonga } from '../../lib/format'
-import { diaAberto, reservaExpirada } from '../../lib/schedule'
+import { diaAberto } from '../../lib/schedule'
 
 export default function Inicio() {
   const { db } = useStore()
@@ -21,38 +21,42 @@ export default function Inicio() {
   const agora = new Date()
   const hoje = toISO(agora)
 
-  const doDia = db.agendamentos.filter((a) => a.data === hoje && !['cancelado', 'bloqueio'].includes(a.status) && !reservaExpirada(a)).sort((a, b) => a.hora.localeCompare(b.hora))
+  const doDia = db.agendamentos.filter((a) => a.data === hoje && !['cancelado', 'bloqueio'].includes(a.status)).sort((a, b) => a.hora.localeCompare(b.hora))
   const atendidas = doDia.filter((a) => a.status === 'concluido')
-  const aReceberHoje = doDia.filter((a) => a.status === 'confirmado').reduce((s, a) => s + a.total - a.sinal.valor, 0)
+  const previstoHoje = doDia.filter((a) => a.status !== 'falta').reduce((s, a) => s + a.total, 0)
 
+  // Mês atual vs mesmo período do mês anterior
   const iniMes = toISO(new Date(agora.getFullYear(), agora.getMonth(), 1))
-  const recebidoMes = movimentacoes(db, iniMes, hoje).reduce((s, m) => s + m.valor, 0)
+  const iniMesAnt = toISO(new Date(agora.getFullYear(), agora.getMonth() - 1, 1))
+  const fimMesAnt = toISO(new Date(agora.getFullYear(), agora.getMonth() - 1, Math.min(agora.getDate(), new Date(agora.getFullYear(), agora.getMonth(), 0).getDate())))
   const mes = calcularStats(db, iniMes, hoje)
+  const varMes = variacao(mes.faturamento, calcularStats(db, iniMesAnt, fimMesAnt).faturamento)
 
   // Ocupação dos próximos 7 dias abertos
   const prox7 = Array.from({ length: 7 }, (_, i) => toISO(addDays(agora, i))).filter((iso) => diaAberto(config, iso))
   const minDia = toMin(config.fecha) - toMin(config.abre) - (toMin(config.almocoFim) - toMin(config.almocoInicio))
-  const minOcup = db.agendamentos.filter((a) => prox7.includes(a.data) && ['confirmado', 'aguardando_sinal'].includes(a.status) && !a.diaInteiro).reduce((s, a) => s + a.duracao, 0)
+  const minOcup = db.agendamentos.filter((a) => prox7.includes(a.data) && a.status === 'agendado').reduce((s, a) => s + a.duracao, 0)
   const ocupacao = prox7.length ? Math.min(1, minOcup / (minDia * prox7.length)) : 0
 
   const ultimos7 = calcularStats(db, toISO(addDays(agora, -6)), hoje).porDia
 
   // Lista de atenção
-  const aguardando = db.agendamentos.filter((a) => a.status === 'aguardando_sinal' && !reservaExpirada(a) && a.data >= hoje).sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora))
+  const amanha = toISO(addDays(agora, 1))
+  const deAmanha = db.agendamentos.filter((a) => a.data === amanha && a.status === 'agendado').sort((a, b) => a.hora.localeCompare(b.hora))
   const pendencias = db.pendencias.filter((m) => m.status === 'aberta')
   const manutencao = manutencaoVencendo(db)
   const aniver = aniversariantes(db, 7)
-  const tudoEmDia = !aguardando.length && !pendencias.length && !manutencao.length && !aniver.length
+  const tudoEmDia = !deAmanha.length && !pendencias.length && !manutencao.length && !aniver.length
 
   const saudacao = agora.getHours() < 12 ? 'Bom dia' : agora.getHours() < 18 ? 'Boa tarde' : 'Boa noite'
-  const proxima = doDia.find((a) => a.status === 'confirmado' && toMin(a.hora) + a.duracao > agora.getHours() * 60 + agora.getMinutes())
+  const proxima = doDia.find((a) => a.status === 'agendado' && toMin(a.hora) + a.duracao > agora.getHours() * 60 + agora.getMinutes())
   const site = typeof window !== 'undefined' ? window.location.origin : ''
 
   return (
     <>
       <Cabecalho
         titulo={`${saudacao}, Ana`}
-        sub={diaAberto(config, hoje) ? `${doDia.length} cliente${doDia.length === 1 ? '' : 's'} hoje · ${doDia.length - atendidas.length} ainda por atender` : 'Hoje o estúdio está fechado. Bom descanso!'}
+        sub={diaAberto(config, hoje) ? `${doDia.length} cliente${doDia.length === 1 ? '' : 's'} hoje · ${doDia.filter((a) => a.status === 'agendado').length} ainda por atender` : 'Hoje o estúdio está fechado. Bom descanso!'}
       >
         <Botao onClick={() => setEncaixe(true)}><CalendarPlus size={16} /> Agendar cliente</Botao>
         <Link to="/admin/agenda" className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full bg-cacau-900 text-nude-50 font-medium hover:bg-blush-700">
@@ -62,8 +66,9 @@ export default function Inicio() {
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Kpi icone={CalendarCheck} rotulo="Atendimentos hoje" valor={`${atendidas.length} de ${doDia.length}`} detalhe={proxima ? `Próxima: ${proxima.hora} · ${primeiroNome(proxima.clienteNome)}` : 'nenhuma por vir'} />
-        <Kpi icone={HandCoins} rotulo="A receber hoje" valor={brl(aReceberHoje)} detalhe="restante das confirmadas" tom="info" />
-        <Kpi icone={Wallet} rotulo="Recebido no mês" valor={brl(recebidoMes)} detalhe={`${mes.concluidos.length} atendimentos · sinais + restantes`} tom="bom" />
+        <Kpi icone={HandCoins} rotulo="Previsto hoje" valor={brl(previstoHoje)} detalhe={`${brl(atendidas.reduce((s, a) => s + a.total, 0))} já recebido`} tom="info" />
+        <Kpi icone={Wallet} rotulo="Faturamento do mês" valor={brl(mes.faturamento)}
+          detalhe={varMes == null ? `${mes.concluidos.length} atendimentos` : `${varMes >= 0 ? '↑' : '↓'} ${Math.abs(Math.round(varMes * 100))}% vs. mês passado`} tom="bom" />
         <Kpi icone={Gauge} rotulo="Agenda dos próximos 7 dias" valor={`${Math.round(ocupacao * 100)}% cheia`} detalhe={`${prox7.length} dias abertos`} tom={ocupacao > 0.8 ? 'alerta' : 'neutro'} />
       </div>
 
@@ -111,19 +116,18 @@ export default function Inicio() {
             </div>
           )}
 
-          {aguardando.length > 0 && (
-            <Bloco icone={Hourglass} cor="text-amber-700 bg-amber-50" titulo="Aguardando o sinal" n={aguardando.length} sub="Horário segurado, falta o Pix">
-              {aguardando.slice(0, 4).map((a) => (
-                <Item key={a.id} nome={a.clienteNome} onNome={() => setFicha(a.clienteId)} linha={`${dataCurta(a.data)} às ${a.hora} · sinal ${brl(a.sinal.valor)}`}>
-                  <a href={linkWhats(a.clienteTelefone, mensagens.cobrarSinal(a, config))} target="_blank" rel="noreferrer" className="p-2 rounded-full text-[#1fa855] hover:bg-nude-100" title="Cobrar no WhatsApp"><WhatsApp size={17} /></a>
-                  <Botao variante="sec" className="!px-2.5 !py-1 !text-xs" onClick={() => onAcao('sinal', a)}>Recebi</Botao>
+          {deAmanha.length > 0 && (
+            <Bloco icone={BellRing} cor="text-violet-700 bg-violet-50" titulo="Lembrar as clientes de amanhã" n={deAmanha.length} sub="Um lembrete evita falta">
+              {deAmanha.slice(0, 5).map((a) => (
+                <Item key={a.id} nome={a.clienteNome} onNome={() => setFicha(a.clienteId)} linha={`${a.hora} · ${a.servicoNomes}`}>
+                  <a href={linkWhats(a.clienteTelefone, mensagens.lembrete(a))} target="_blank" rel="noreferrer" className="p-2 rounded-full text-[#1fa855] hover:bg-nude-100" title="Lembrete no WhatsApp"><WhatsApp size={17} /></a>
                 </Item>
               ))}
             </Bloco>
           )}
 
           {pendencias.length > 0 && (
-            <Bloco icone={AlertTriangle} cor="text-red-600 bg-red-50" titulo="Clientes devendo" n={pendencias.length} sub={`${brl(pendencias.reduce((s, m) => s + m.valor, 0))} em aberto`} link="/admin/financeiro?aba=pendencias">
+            <Bloco icone={AlertTriangle} cor="text-red-600 bg-red-50" titulo="Multas e débitos em aberto" n={pendencias.length} sub={`${brl(pendencias.reduce((s, m) => s + m.valor, 0))} a receber`} link="/admin/financeiro?aba=pendencias">
               {pendencias.slice(0, 3).map((m) => (
                 <Item key={m.id} nome={m.clienteNome} onNome={() => setFicha(m.clienteId)} linha={m.descricao}>
                   <span className="text-sm font-semibold text-cacau-900 tabular-nums">{brl(m.valor)}</span>
@@ -133,11 +137,11 @@ export default function Inicio() {
           )}
 
           {manutencao.length > 0 && (
-            <Bloco icone={Sparkles} cor="text-violet-700 bg-violet-50" titulo="Manutenção vencendo" n={manutencao.length} sub={`Extensão há ~${config.manutencaoDias} dias e sem horário marcado`}>
+            <Bloco icone={Sparkles} cor="text-blush-700 bg-blush-100" titulo="Manutenção vencendo" n={manutencao.length} sub="Perto do prazo do modelo e sem horário marcado">
               {manutencao.slice(0, 5).map((c) => {
-                const msg = `Oi, ${primeiroNome(c.nome)}! Já faz ${c.dias} dias da sua extensão. Bora marcar a manutenção pra ela continuar linda? Os horários estão aqui: ${site}`
+                const msg = `Oi, ${primeiroNome(c.nome)}! Já faz ${c.dias} dias do seu ${c.ultimaCiliosItem.base.nome}. Bora marcar a manutenção pra ele continuar lindo? Os horários estão aqui: ${site}`
                 return (
-                  <Item key={c.id} nome={c.nome} onNome={() => setFicha(c.id)} linha={`${c.dias} dias · ${c.ultimaExtensaoServico}`} alerta={c.dias > config.manutencaoDias}>
+                  <Item key={c.id} nome={c.nome} onNome={() => setFicha(c.id)} linha={`${c.dias} de ${c.prazoManutencao} dias · ${c.ultimaCiliosItem.base.nome}`} alerta={c.dias > c.prazoManutencao}>
                     {c.telefone && <a href={linkWhats(c.telefone, msg)} target="_blank" rel="noreferrer" className="p-2 rounded-full text-[#1fa855] hover:bg-nude-100" title="Lembrar no WhatsApp"><WhatsApp size={17} /></a>}
                   </Item>
                 )
@@ -146,7 +150,7 @@ export default function Inicio() {
           )}
 
           {aniver.length > 0 && (
-            <Bloco icone={Cake} cor="text-blush-700 bg-blush-100" titulo="Aniversariantes da semana" n={aniver.length}>
+            <Bloco icone={Cake} cor="text-amber-700 bg-amber-50" titulo="Aniversariantes da semana" n={aniver.length}>
               {aniver.map((c) => (
                 <Item key={c.id} nome={c.nome} onNome={() => setFicha(c.id)} linha={c.emDias === 0 ? 'Hoje!' : `${DIAS_CURTOS[fromISO(c.data).getDay()]}, ${dataCurta(c.data)}`}>
                   {c.telefone && (

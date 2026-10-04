@@ -5,12 +5,12 @@ import { useStore } from '../../store/Store'
 
 // Trocar pelos antes/depois reais quando a Ana mandar as fotos
 const FOTOS = [
-  ['Fio a fio', 1],
-  ['Volume brasileiro', 2],
-  ['Volume egípcio', 3],
-  ['Volume russo', 5],
-  ['Lash lifting', 1],
-  ['Antes & depois', 3],
+  ['Efeito Fox', 3],
+  ['Volume Brasileiro', 2],
+  ['Volume Glamour', 4],
+  ['Efeito Sirena', 2],
+  ['Volume Luxo', 5],
+  ['Cílios marrom', 3],
 ]
 
 export default function Galeria() {

@@ -5,6 +5,7 @@ import { Botao, Toggle, Campo, Avatar } from './ui'
 import { EscolhaServicos } from './Escolhas'
 import { useStore } from '../../store/Store'
 import { brl } from '../../lib/format'
+import { itensDe } from '../../lib/catalogo'
 
 /** Lança um débito manual na conta da cliente (ex.: restante não pago). */
 export default function ModalDebito({ cliente: clienteFixo, onFechar }) {
@@ -17,11 +18,11 @@ export default function ModalDebito({ cliente: clienteFixo, onFechar }) {
   const [bloqueia, setBloqueia] = useState(true)
 
   const sugestoes = busca.length >= 2 ? db.clientes.filter((c) => c.nome.toLowerCase().includes(busca.toLowerCase())).slice(0, 5) : []
-  const nomesSel = sel.map((id) => db.servicos.find((s) => s.id === id)?.nome).filter(Boolean).join(' + ')
+  const nomesSel = itensDe(db.servicos, sel).nomes
 
   const escolher = (novo) => {
     setSel(novo)
-    setValor(String(novo.reduce((s, x) => s + (db.servicos.find((v) => v.id === x)?.preco ?? 0), 0)))
+    setValor(String(itensDe(db.servicos, novo).total))
   }
 
   const salvar = () => {

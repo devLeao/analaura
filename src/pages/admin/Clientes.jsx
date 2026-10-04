@@ -4,7 +4,7 @@ import { useStore } from '../../store/Store'
 import FichaCliente from '../../components/admin/FichaCliente'
 import { Cabecalho, Avatar, Abas, Vazio, Botao, Etiqueta, Campo } from '../../components/admin/ui'
 import Modal from '../../components/ui/Modal'
-import { resumoClientes } from '../../lib/stats'
+import { resumoClientes, emManutencao } from '../../lib/stats'
 import { brl, dataCurta, toISO, diasEntreISO, telefoneMask } from '../../lib/format'
 
 const ORDENS = [
@@ -24,12 +24,10 @@ export default function Clientes() {
 
   const hoje = toISO(new Date())
   const todas = useMemo(() => resumoClientes(db), [db])
-  const prazo = db.config.manutencaoDias
   const situacao = (c) => ({
     devendo: c.devendo > 0,
-    credito: c.credito > 0,
     agendada: !!c.proximo,
-    manutencao: !!c.ultimaExtensao && !c.proximo && diasEntreISO(c.ultimaExtensao, hoje) >= prazo - 7 && diasEntreISO(c.ultimaExtensao, hoje) <= prazo + 7,
+    manutencao: emManutencao(c, hoje),
     sumida: !!c.ultima && !c.proximo && diasEntreISO(c.ultima, hoje) > 45,
   })
   const conta = (k) => todas.filter((c) => situacao(c)[k]).length
@@ -67,7 +65,6 @@ export default function Clientes() {
             ['agendada', 'Com horário', conta('agendada')],
             ['manutencao', 'Manutenção', conta('manutencao')],
             ['devendo', 'Devendo', conta('devendo')],
-            ['credito', 'Com crédito', conta('credito')],
             ['sumida', 'Sumidas', conta('sumida')],
           ]}
         />
@@ -83,7 +80,7 @@ export default function Clientes() {
               <thead className="text-xs text-cacau-500 border-b border-nude-200 bg-nude-50/60">
                 <tr>
                   <th className="text-left font-medium px-4 py-3">Cliente</th>
-                  <th className="text-left font-medium px-4 py-3">Estilo / mapping</th>
+                  <th className="text-left font-medium px-4 py-3">Modelo / mapping</th>
                   <th className="text-left font-medium px-4 py-3">Última visita</th>
                   <th className="text-left font-medium px-4 py-3">Próximo horário</th>
                   <th className="text-right font-medium px-4 py-3">Gasto total</th>
@@ -103,7 +100,7 @@ export default function Clientes() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-cacau-800">{c.ficha?.estilo || '—'}</div>
+                      <div className="text-cacau-800">{c.ficha?.estilo || '—'}{c.ficha?.cor === 'Marrom' && <span className="ml-1.5 inline-block h-2.5 w-2.5 rounded-full bg-[#7a4a2e] align-middle" title="Marrom" />}</div>
                       <div className="text-xs text-cacau-500">{[c.ficha?.curvatura, c.ficha?.espessura, c.ficha?.mapping?.split(' · ')[0]].filter(Boolean).join(' · ')}</div>
                     </td>
                     <td className="px-4 py-3 text-cacau-600">{c.ultima ? <>{dataCurta(c.ultima)} <span className="text-cacau-500 text-xs">· há {diasEntreISO(c.ultima, hoje)}d</span></> : '—'}</td>
@@ -144,7 +141,6 @@ function Situacao({ s, c, ocultarVazio = false }) {
   if (s.devendo) tags.push(<Etiqueta key="d" cls="text-red-700 bg-red-50 border-red-200">Deve {brl(c.devendo)}</Etiqueta>)
   if (s.agendada) tags.push(<Etiqueta key="a" cls="text-violet-800 bg-violet-50 border-violet-200">Agendada</Etiqueta>)
   if (s.manutencao) tags.push(<Etiqueta key="m" cls="text-amber-800 bg-amber-50 border-amber-200">Manutenção</Etiqueta>)
-  if (s.credito) tags.push(<Etiqueta key="c" cls="text-emerald-800 bg-emerald-50 border-emerald-200">Crédito {brl(c.credito)}</Etiqueta>)
   if (s.sumida) tags.push(<Etiqueta key="s">Sumida</Etiqueta>)
   if (!tags.length) return ocultarVazio ? null : <span className="text-xs text-cacau-500">—</span>
   return <div className="flex flex-wrap gap-1">{tags}</div>

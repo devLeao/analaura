@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Wallet, Sparkles, Ticket, Users, UserX, HandCoins, Download, Receipt, CheckCircle2, Ban, Plus, Zap, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { Wallet, Sparkles, Ticket, Users, UserX, HandCoins, Download, Receipt, CheckCircle2, Ban, Plus, Zap, ArrowDownLeft } from 'lucide-react'
 import { useStore } from '../../store/Store'
 import { Cabecalho, Kpi, Delta, Abas, Botao, Vazio, Status, Avatar, Etiqueta } from '../../components/admin/ui'
 import { CardGrafico, GraficoColunas, BarrasRanking, MapaCalor, COR } from '../../components/admin/Graficos'
@@ -57,9 +57,9 @@ export default function Financeiro() {
 
   return (
     <>
-      <Cabecalho titulo="Financeiro" sub={aba === 'pendencias' ? 'Valores que as clientes ficaram devendo' : `${dataBR(ini)} a ${dataBR(fim)}`} />
+      <Cabecalho titulo="Financeiro" sub={aba === 'pendencias' ? 'Multas por falta e valores que as clientes ficaram devendo' : `${dataBR(ini)} a ${dataBR(fim)}`} />
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
-        <Abas valor={aba} onChange={setAba} abas={[['resumo', 'Resumo'], ['caixa', 'Entradas e saídas'], ['pendencias', 'Pendências', abertas.length]]} />
+        <Abas valor={aba} onChange={setAba} abas={[['resumo', 'Resumo'], ['caixa', 'Entradas e saídas'], ['pendencias', 'Multas e débitos', abertas.length]]} />
         {aba !== 'pendencias' && (
           <div className="flex flex-col md:flex-row md:items-center gap-3 lg:ml-auto">
             <Abas valor={preset} onChange={setPreset} abas={PRESETS} />
@@ -91,8 +91,8 @@ function Resumo({ ini, fim }) {
   const caixa = useMemo(() => movimentacoes(db, ini, fim).reduce((x, m) => x + m.valor, 0), [db, ini, fim])
   // Tudo que já está marcado daqui pra frente (independe do período escolhido)
   const hoje = toISO(new Date())
-  const futuros = db.agendamentos.filter((x) => x.data >= hoje && ['confirmado', 'aguardando_sinal'].includes(x.status))
-  const aReceber = futuros.reduce((x, g) => x + g.total - (g.sinal?.pago ? g.sinal.valor : 0), 0)
+  const futuros = db.agendamentos.filter((x) => x.data >= hoje && x.status === 'agendado')
+  const aReceber = futuros.reduce((x, g) => x + g.total, 0)
 
   // Para períodos longos, agrupa por semana
   const porSemana = dias > 45
@@ -111,23 +111,25 @@ function Resumo({ ini, fim }) {
 
   const horas = []
   for (let h = Math.floor(toMin(db.config.abre) / 60); h < Math.ceil(toMin(db.config.fecha) / 60); h++) horas.push(h)
-  const totalCat = s.porCategoria.cilios + s.porCategoria.sobrancelhas
+  const CATS = [['cilios', 'Cílios', COR.serie], ['sobrancelhas', 'Sobrancelhas', '#dcc8b8'], ['remocao', 'Remoção', '#8a736b']]
+  const totalCat = CATS.reduce((x, [k]) => x + (s.porCategoria[k] || 0), 0)
+  const totalCilios = s.cilios.aplicacoes + s.cilios.manutencoes
   const formas = Object.entries(s.formas).sort((x, y) => y[1] - x[1])
 
   return (
     <>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Kpi icone={Wallet} rotulo="Faturamento" valor={brl(s.faturamento)} detalhe={<Delta v={variacao(s.faturamento, a.faturamento)} />} tom="bom" />
-        <Kpi icone={HandCoins} rotulo="Entrou no caixa" valor={brl(caixa)} detalhe="sinais + restantes + pendências" tom="info" />
+        <Kpi icone={HandCoins} rotulo="Entrou no caixa" valor={brl(caixa)} detalhe="atendimentos + multas pagas" tom="info" />
         <Kpi icone={Sparkles} rotulo="Atendimentos" valor={s.concluidos.length} detalhe={<Delta v={variacao(s.concluidos.length, a.concluidos.length)} />} />
         <Kpi icone={Ticket} rotulo="Ticket médio" valor={brl(s.ticket)} detalhe={<Delta v={variacao(s.ticket, a.ticket)} />} />
         <Kpi icone={Users} rotulo="Clientes atendidas" valor={s.atendidas} detalhe={`${s.novas} novas · ${s.recorrentes} que voltaram`} />
         <Kpi icone={UserX} rotulo="Faltas" valor={`${s.faltas.length} · ${pct(s.taxaFalta)}`} detalhe={<Delta v={variacao(s.faltas.length, a.faltas.length)} menorMelhor />} tom="critico" />
-        <Kpi icone={Receipt} rotulo="Sinais retidos" valor={brl(s.retidos)} detalhe="faltas e cancelamentos em cima da hora" tom="alerta" />
+        <Kpi icone={Receipt} rotulo="Multas recebidas" valor={brl(s.multasRecebidas)} detalhe={`${brl(s.multasGeradas)} geradas · ${brl(s.perdaFaltas)} perdidos com faltas`} tom="alerta" />
         <Kpi icone={Wallet} rotulo="A receber da agenda futura" valor={brl(aReceber)} detalhe={`${futuros.length} horário(s) marcado(s) a partir de hoje`} />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
+      <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 mb-6 items-start">
         <div className="lg:col-span-2 min-w-0">
           <CardGrafico
             titulo={`Faturamento por ${porSemana ? 'semana' : 'dia'}`}
@@ -149,24 +151,37 @@ function Resumo({ ini, fim }) {
 
         <section className="card p-4 sm:p-5 space-y-6">
           <div>
-            <h3 className="text-sm font-semibold text-cacau-900">Cílios x sobrancelhas</h3>
+            <h3 className="text-sm font-semibold text-cacau-900">Cílios, sobrancelhas e remoção</h3>
             <p className="text-xs text-cacau-500 mt-0.5 mb-4">Participação no faturamento</p>
             {totalCat === 0 ? <Vazio texto="Sem dados no período." /> : (
               <>
                 <div className="flex h-3 rounded-full overflow-hidden gap-[2px] mb-3">
-                  <div style={{ width: `${(s.porCategoria.cilios / totalCat) * 100}%`, background: COR.serie }} />
-                  <div className="bg-nude-300" style={{ width: `${(s.porCategoria.sobrancelhas / totalCat) * 100}%` }} />
+                  {CATS.map(([k, , cor]) => <div key={k} style={{ width: `${((s.porCategoria[k] || 0) / totalCat) * 100}%`, background: cor }} />)}
                 </div>
                 <ul className="space-y-1.5 text-sm">
-                  <li className="flex justify-between"><span className="flex items-center gap-2 text-cacau-600"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: COR.serie }} />Cílios</span><span className="tabular-nums text-cacau-900">{brl(s.porCategoria.cilios)} <span className="text-cacau-500 text-xs">{pct(s.porCategoria.cilios / totalCat)}</span></span></li>
-                  <li className="flex justify-between"><span className="flex items-center gap-2 text-cacau-600"><span className="h-2.5 w-2.5 rounded-sm bg-nude-300" />Sobrancelhas</span><span className="tabular-nums text-cacau-900">{brl(s.porCategoria.sobrancelhas)} <span className="text-cacau-500 text-xs">{pct(s.porCategoria.sobrancelhas / totalCat)}</span></span></li>
+                  {CATS.map(([k, nome, cor]) => (
+                    <li key={k} className="flex justify-between">
+                      <span className="flex items-center gap-2 text-cacau-600"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: cor }} />{nome}</span>
+                      <span className="tabular-nums text-cacau-900">{brl(s.porCategoria[k] || 0)} <span className="text-cacau-500 text-xs">{pct((s.porCategoria[k] || 0) / totalCat)}</span></span>
+                    </li>
+                  ))}
                 </ul>
               </>
             )}
           </div>
+          {totalCilios > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-cacau-900">Cílios: aplicação x manutenção</h3>
+              <p className="text-xs text-cacau-500 mt-0.5 mb-3">{s.cilios.marrom} em marrom</p>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="bg-nude-50 rounded-2xl p-3"><div className="text-[11px] text-cacau-500">Aplicações</div><div className="font-semibold text-cacau-900">{s.cilios.aplicacoes} <span className="text-xs text-cacau-500 font-normal">{pct(s.cilios.aplicacoes / totalCilios)}</span></div></div>
+                <div className="bg-nude-50 rounded-2xl p-3"><div className="text-[11px] text-cacau-500">Manutenções</div><div className="font-semibold text-cacau-900">{s.cilios.manutencoes} <span className="text-xs text-cacau-500 font-normal">{pct(s.cilios.manutencoes / totalCilios)}</span></div></div>
+              </div>
+            </div>
+          )}
           <div>
-            <h3 className="text-sm font-semibold text-cacau-900">Como pagaram o restante</h3>
-            <p className="text-xs text-cacau-500 mt-0.5 mb-4">No dia do atendimento</p>
+            <h3 className="text-sm font-semibold text-cacau-900">Formas de pagamento</h3>
+            <p className="text-xs text-cacau-500 mt-0.5 mb-4">Atendimentos concluídos</p>
             {formas.length === 0 ? <Vazio texto="Sem dados no período." /> : (
               <BarrasRanking itens={formas} valor={(f) => f[1]} rotulo={(f) => FORMAS_PAGAMENTO[f[0]] || f[0]} formatar={brl} />
             )}
@@ -232,10 +247,10 @@ function Caixa({ ini, fim }) {
   return (
     <>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <Kpi icone={ArrowDownLeft} rotulo="Total que entrou" valor={brl(soma(movs.filter((m) => m.valor > 0)))} detalhe={`${movs.filter((m) => m.valor > 0).length} entradas`} tom="bom" />
-        <Kpi icone={ArrowUpRight} rotulo="Sinais devolvidos" valor={brl(-soma(movs.filter((m) => m.valor < 0)))} detalhe="estornos" tom="alerta" />
-        <Kpi icone={HandCoins} rotulo="Sinais recebidos" valor={brl(soma(movs.filter((m) => m.tipo === 'Sinal')))} />
-        <Kpi icone={Wallet} rotulo="Restantes no dia" valor={brl(soma(movs.filter((m) => m.tipo === 'Restante')))} />
+        <Kpi icone={ArrowDownLeft} rotulo="Total que entrou" valor={brl(soma(movs))} detalhe={`${movs.length} entradas`} tom="bom" />
+        <Kpi icone={Wallet} rotulo="Atendimentos" valor={brl(soma(movs.filter((m) => m.tipo === 'Atendimento')))} detalhe={`${movs.filter((m) => m.tipo === 'Atendimento').length} pagamentos`} />
+        <Kpi icone={Receipt} rotulo="Multas pagas" valor={brl(soma(movs.filter((m) => m.tipo === 'Multa')))} tom="alerta" />
+        <Kpi icone={HandCoins} rotulo="Débitos quitados" valor={brl(soma(movs.filter((m) => m.tipo === 'Débito')))} />
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4 text-xs">
@@ -245,7 +260,7 @@ function Caixa({ ini, fim }) {
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <Abas valor={tipo} onChange={setTipo} abas={[['todos', 'Tudo', movs.length], ['Sinal', 'Sinais'], ['Restante', 'Restantes'], ['Pendência', 'Pendências'], ['Sinal devolvido', 'Devoluções']]} />
+        <Abas valor={tipo} onChange={setTipo} abas={[['todos', 'Tudo', movs.length], ['Atendimento', 'Atendimentos'], ['Multa', 'Multas'], ['Débito', 'Débitos']]} />
         <Botao onClick={exportar}><Download size={16} /> Exportar planilha</Botao>
       </div>
 
@@ -292,10 +307,9 @@ function Caixa({ ini, fim }) {
 
 const TipoMov = ({ t }) => {
   const cls = {
-    Sinal: 'text-violet-800 bg-violet-50 border-violet-200',
-    Restante: 'text-emerald-800 bg-emerald-50 border-emerald-200',
-    'Pendência': 'text-amber-800 bg-amber-50 border-amber-200',
-    'Sinal devolvido': 'text-red-700 bg-red-50 border-red-200',
+    Atendimento: 'text-emerald-800 bg-emerald-50 border-emerald-200',
+    Multa: 'text-red-700 bg-red-50 border-red-200',
+    'Débito': 'text-amber-800 bg-amber-50 border-amber-200',
   }[t]
   return <Etiqueta cls={cls}>{t}</Etiqueta>
 }
@@ -313,12 +327,12 @@ function Pendencias() {
   const soma = (arr) => arr.reduce((s, m) => s + m.valor, 0)
   const telDe = (id) => db.clientes.find((c) => c.id === id)?.telefone || ''
   const msgCobranca = (m) =>
-    `Oi, ${primeiroNome(m.clienteNome)}! Tudo bem? Ficou uma pendência de ${brl(m.valor)}: ${m.descricao}. Você pode pagar pelo Pix direto no site (em "Meus horários") e a agenda libera na hora. Obrigada!`
+    `Oi, ${primeiroNome(m.clienteNome)}! Tudo bem? Ficou em aberto ${brl(m.valor)}: ${m.descricao}. Você pode pagar pelo Pix direto no site (em "Meus horários") e a agenda libera na hora. Obrigada!`
 
   return (
     <>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <Kpi icone={Receipt} rotulo="Em aberto" valor={brl(soma(por('aberta')))} detalhe={`${por('aberta').length} pendência(s)`} tom="alerta" />
+        <Kpi icone={Receipt} rotulo="Em aberto" valor={brl(soma(por('aberta')))} detalhe={`${por('aberta').length} multa(s)/débito(s)`} tom="alerta" />
         <Kpi icone={HandCoins} rotulo="Recebido no mês" valor={brl(soma(por('paga').filter((m) => m.pagaEm >= iniMes)))} tom="bom" />
         <Kpi icone={CheckCircle2} rotulo="Recebido (total)" valor={brl(soma(por('paga')))} detalhe={`${por('paga').length} pendência(s) quitada(s)`} />
         <Kpi icone={Ban} rotulo="Perdoadas" valor={brl(soma(por('perdoada')))} detalhe={`${por('perdoada').length} pendência(s)`} />
@@ -327,7 +341,7 @@ function Pendencias() {
       <div className="card p-4 mb-5 flex gap-3 items-start !bg-blush-100/40 !border-blush-200">
         <Zap size={18} className="text-blush-700 shrink-0 mt-0.5" />
         <p className="text-sm text-cacau-700">
-          Quando a cliente paga pelo Pix no site, a pendência é baixada <strong className="text-cacau-900">sozinha</strong>, a agenda dela libera e você recebe uma notificação.
+          Falta sem aviso gera multa de {db.config.multaPct}% automaticamente. Quando a cliente paga pelo Pix no site, a multa é baixada <strong className="text-cacau-900">sozinha</strong>, a agenda dela libera e você recebe uma notificação.
           Use "Marcar como paga" só para pagamentos feitos por fora.
         </p>
       </div>
@@ -351,7 +365,7 @@ function Pendencias() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-cacau-900">{m.clienteNome}</span>
                       <Status s={m.status} />
-                      {m.tipo === 'falta' && <Etiqueta>Falta sem sinal</Etiqueta>}
+                      <Etiqueta cls={m.tipo === 'falta' ? 'text-red-700 bg-red-50 border-red-200' : undefined}>{m.tipo === 'falta' ? 'Multa por falta' : 'Débito'}</Etiqueta>
                       {!m.bloqueia && m.status === 'aberta' && <Etiqueta>não bloqueia</Etiqueta>}
                     </div>
                     <div className="text-xs text-cacau-500 mt-0.5">

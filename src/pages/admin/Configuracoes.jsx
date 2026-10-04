@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Save, RotateCcw, QrCode, ShieldCheck, Clock, HandCoins, Store, Plug } from 'lucide-react'
+import { Save, RotateCcw, QrCode, ShieldCheck, Clock, Receipt, Store, Plug } from 'lucide-react'
 import { useStore } from '../../store/Store'
 import { Cabecalho, Botao, Secao, Campo } from '../../components/admin/ui'
 import Modal from '../../components/ui/Modal'
-import { DIAS_CURTOS, brl, sinalDe, duracaoLabel } from '../../lib/format'
+import { DIAS_CURTOS, brl, multaDe } from '../../lib/format'
 import { gerarSlots } from '../../lib/schedule'
 import { CONFIG_PADRAO } from '../../data/seed'
 
@@ -14,12 +14,12 @@ export default function Configuracoes() {
   const set = (k, num = false) => (e) => setF({ ...f, [k]: num ? Number(e.target.value) : e.target.value })
   const toggleDia = (d) => setF({ ...f, diasAbertos: f.diasAbertos.includes(d) ? f.diasAbertos.filter((x) => x !== d) : [...f.diasAbertos, d].sort() })
   const alterado = JSON.stringify(f) !== JSON.stringify(db.config)
-  const ex = db.servicos.find((s) => s.id === 'brasileiro') || db.servicos[0]
+  const ex = db.servicos.find((s) => s.id === 'glamour') || db.servicos[0]
   const slots = gerarSlots(f)
 
   return (
     <>
-      <Cabecalho titulo="Configurações" sub="Regras da agenda, do sinal e dados do estúdio">
+      <Cabecalho titulo="Configurações" sub="Regras da agenda, da multa e dados do estúdio">
         <Botao variante="pri" disabled={!alterado} onClick={() => { salvarConfig(f); avisar('Configurações salvas.') }}><Save size={16} /> Salvar alterações</Botao>
       </Cabecalho>
       {alterado && <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-5">Você tem alterações não salvas.</p>}
@@ -45,21 +45,19 @@ export default function Configuracoes() {
           <p className="text-xs text-cacau-500 mt-3">{slots.length} horários de início por dia: {slots.slice(0, 4).join(', ')}…</p>
         </Secao>
 
-        <Secao titulo="Sinal e cancelamento" icone={HandCoins}>
+        <Secao titulo="Cancelamento e multa" icone={Receipt}>
           <div className="grid grid-cols-2 gap-3">
-            <Campo rotulo="Sinal para reservar (%)"><input type="number" min="0" max="100" className="input" value={f.sinalPct} onChange={set('sinalPct', true)} /></Campo>
-            <Campo rotulo="Tempo para pagar o Pix (min)"><input type="number" min="5" className="input" value={f.reservaMin} onChange={set('reservaMin', true)} /></Campo>
-            <Campo rotulo="Cancelar e ganhar crédito até (horas antes)"><input type="number" min="0" className="input" value={f.remarcarHoras} onChange={set('remarcarHoras', true)} /></Campo>
-            <Campo rotulo="Prazo da manutenção (dias)"><input type="number" min="7" className="input" value={f.manutencaoDias} onChange={set('manutencaoDias', true)} /></Campo>
+            <Campo rotulo="Cliente cancela pelo site até (horas antes)"><input type="number" min="0" className="input" value={f.antecedenciaCancelHoras} onChange={set('antecedenciaCancelHoras', true)} /></Campo>
+            <Campo rotulo="Multa por falta (%)"><input type="number" min="0" max="100" className="input" value={f.multaPct} onChange={set('multaPct', true)} /></Campo>
           </div>
           <div className="mt-4 bg-nude-50 rounded-2xl p-4 text-xs text-cacau-600 space-y-1.5 leading-relaxed">
-            <p><strong className="text-cacau-900">Como fica:</strong> {ex.nome} ({brl(ex.preco)}) → sinal de <strong className="text-cacau-900">{brl(sinalDe(ex.preco, f.sinalPct))}</strong> no Pix, restante no dia.</p>
-            <p>A cliente tem {duracaoLabel(f.reservaMin)} para pagar; depois disso o horário volta para a agenda.</p>
-            <p>Cancelando com mais de {f.remarcarHoras}h, o sinal vira crédito. Em cima da hora ou falta, o sinal fica com você.</p>
-            <p>Clientes com extensão há ~{f.manutencaoDias} dias e sem horário aparecem no Início para você lembrar.</p>
+            <p><strong className="text-cacau-900">Como fica:</strong> sem sinal; a cliente paga no dia. Se faltar no {ex.nome} ({brl(ex.preco)}), gera multa de <strong className="text-cacau-900">{brl(multaDe(ex.preco, f.multaPct))}</strong>.</p>
+            <p>Com multa em aberto, ela não consegue agendar pelo site até pagar (Pix no próprio site).</p>
+            <p>Faltando menos de {f.antecedenciaCancelHoras}h, ela não consegue cancelar sozinha e o site pede para falar com você.</p>
+            <p>O prazo de manutenção de cada modelo fica em Serviços.</p>
           </div>
 
-          <h4 className="text-sm font-semibold text-cacau-900 mt-6 mb-3 flex items-center gap-2"><QrCode size={16} className="text-blush-600" /> Recebimento via Pix</h4>
+          <h4 className="text-sm font-semibold text-cacau-900 mt-6 mb-3 flex items-center gap-2"><QrCode size={16} className="text-blush-600" /> Pix para pagamento de multas</h4>
           <div className="grid gap-3">
             <Campo rotulo="Chave Pix"><input className="input" value={f.pixChave} onChange={set('pixChave')} /></Campo>
             <div className="grid grid-cols-2 gap-3">
@@ -84,7 +82,7 @@ export default function Configuracoes() {
 
         <Secao titulo="Próxima fase" icone={Plug}>
           <ul className="space-y-4 text-sm">
-            <Integracao icone={QrCode} titulo="Pix com confirmação automática" texto="Cobrança gerada pelo Mercado Pago / Asaas. Quando o banco confirma, o horário é confirmado sozinho." />
+            <Integracao icone={QrCode} titulo="Pix com confirmação automática" texto="Cobrança gerada pelo Mercado Pago / Asaas. Quando o banco confirma, a multa é baixada e a cliente liberada sozinha." />
             <Integracao icone={ShieldCheck} titulo="Login com Google de verdade" texto="Autenticação real e dados salvos na nuvem, acessíveis do celular e do computador." />
           </ul>
           <div className="mt-6 pt-5 border-t border-nude-200">

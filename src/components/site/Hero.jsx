@@ -17,11 +17,11 @@ export default function Hero() {
           </h1>
           <Ornamento className="my-8 lg:!justify-start" />
           <p className="text-cacau-600 text-base sm:text-lg max-w-xl mx-auto lg:mx-0 leading-relaxed">
-            Do fio a fio mais natural ao volume russo mais marcante: cada aplicação é pensada para o formato dos seus olhos e o seu estilo.
+            Do Volume Brasileiro mais natural ao Volume Power mais marcante, em preto ou marrom: cada aplicação é pensada para o formato dos seus olhos e o seu estilo.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
             <a href="#agendar" className="btn-primary">Agendar horário</a>
-            <a href="#servicos" className="btn-ghost">Ver estilos</a>
+            <a href="#servicos" className="btn-ghost">Ver modelos</a>
           </div>
         </div>
 

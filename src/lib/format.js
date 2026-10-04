@@ -51,8 +51,8 @@ export const duracaoLabel = (min) => {
   return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
 }
 
-/** Valor do sinal arredondado para centavos. */
-export const sinalDe = (total, pct) => Math.round(total * pct) / 100
+/** Valor da multa (porcentagem do total) arredondado para centavos. */
+export const multaDe = (total, pct) => Math.round(total * pct) / 100
 
 export const iniciais = (nome = '') =>
   nome.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('')

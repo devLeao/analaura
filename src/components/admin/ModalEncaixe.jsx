@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Search, Wallet } from 'lucide-react'
+import { Search } from 'lucide-react'
 import Modal from '../ui/Modal'
-import { Botao, Toggle, Campo, Avatar } from './ui'
+import { Botao, Campo, Avatar } from './ui'
 import { EscolhaServicos } from './Escolhas'
 import { useStore } from '../../store/Store'
-import { brl, toMin, fromMin, telefoneMask, duracaoLabel, sinalDe, toISO } from '../../lib/format'
+import { brl, toMin, fromMin, telefoneMask, duracaoLabel, toISO } from '../../lib/format'
+import { itensDe } from '../../lib/catalogo'
 import { gerarSlots, intervalosOcupados, slotLivre } from '../../lib/schedule'
 
 /** Agendar uma cliente pelo painel (encaixe, remarcação pelo WhatsApp, cliente nova...). */
@@ -17,16 +18,12 @@ export default function ModalEncaixe({ dataInicial, horaInicial = '', clienteFix
   const [sel, setSel] = useState([])
   const [data, setData] = useState(dataInicial || toISO(new Date()))
   const [hora, setHora] = useState(horaInicial)
-  const [sinalPago, setSinalPago] = useState(false)
   const [nota, setNota] = useState('')
 
-  const itens = sel.map((id) => db.servicos.find((s) => s.id === id)).filter(Boolean)
-  const duracao = itens.reduce((s, i) => s + i.duracao, 0)
-  const total = itens.reduce((s, i) => s + i.preco, 0)
+  const { nomes, total, duracao } = itensDe(db.servicos, sel)
   const ocupados = intervalosOcupados(db.agendamentos, data)
   const horas = gerarSlots(config).filter((h) => slotLivre(config, h, duracao || config.slotMin, ocupados, '0000-00-00'))
   const sugestoes = busca.length >= 2 ? db.clientes.filter((c) => c.nome.toLowerCase().includes(busca.toLowerCase()) || (c.telefone || '').includes(busca)).slice(0, 5) : []
-  const credito = cliente?.credito || 0
 
   const salvar = () => {
     let c = cliente
@@ -34,22 +31,19 @@ export default function ModalEncaixe({ dataInicial, horaInicial = '', clienteFix
       if (!busca.trim()) return avisar('Informe a cliente.', 'erro')
       c = criarCliente({ nome: busca.trim(), telefone: novoTel })
     }
-    criarAgendamentoAdmin(
-      {
-        clienteId: c.id,
-        clienteNome: c.nome,
-        clienteTelefone: c.telefone || novoTel,
-        servicoIds: sel,
-        servicoNomes: itens.map((i) => i.nome).join(' + '),
-        total,
-        duracao,
-        data,
-        hora,
-        nota,
-      },
-      sinalPago
-    )
-    avisar(sinalPago ? 'Cliente agendada e confirmada.' : 'Cliente agendada. Aguardando o sinal.')
+    criarAgendamentoAdmin({
+      clienteId: c.id,
+      clienteNome: c.nome,
+      clienteTelefone: c.telefone || novoTel,
+      servicoIds: sel,
+      servicoNomes: nomes,
+      total,
+      duracao,
+      data,
+      hora,
+      nota,
+    })
+    avisar('Cliente agendada.')
     onFechar()
   }
 
@@ -106,14 +100,9 @@ export default function ModalEncaixe({ dataInicial, horaInicial = '', clienteFix
           </Campo>
         </div>
 
-        <div className="bg-nude-50 rounded-2xl p-4 space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-cacau-600">{duracao ? duracaoLabel(duracao) : '—'} · total</span>
-            <span className="font-semibold text-cacau-900 tabular-nums">{brl(total)}</span>
-          </div>
-          <Toggle ligado={sinalPago} onChange={setSinalPago} rotulo={`Sinal de ${brl(sinalDe(total, config.sinalPct))} já recebido`} />
-          {!sinalPago && <p className="text-xs text-cacau-500">Fica como "aguardando sinal" e aparece na sua lista de pendências do dia.</p>}
-          {credito > 0 && <p className="text-xs text-emerald-700 flex items-center gap-1"><Wallet size={12} /> Esta cliente tem {brl(credito)} de crédito (de um cancelamento).</p>}
+        <div className="bg-nude-50 rounded-2xl p-4 flex justify-between text-sm">
+          <span className="text-cacau-600">{duracao ? duracaoLabel(duracao) : '—'} · pago no dia</span>
+          <span className="font-semibold text-cacau-900 tabular-nums">{brl(total)}</span>
         </div>
 
         <Campo rotulo="Observação (só você vê)">
