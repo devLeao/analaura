@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import Navbar from '../components/site/Navbar'
 import Hero from '../components/site/Hero'
+import Faixa from '../components/site/Faixa'
 import Sobre from '../components/site/Sobre'
 import Servicos from '../components/site/Servicos'
 import ComoFunciona from '../components/site/ComoFunciona'
@@ -33,10 +34,12 @@ export default function Site() {
   }
 
   return (
-    <>
+    // tema-escuro: o site usa a paleta preta e cinza (ver index.css)
+    <div className="tema-escuro min-h-screen">
       <Navbar onLogin={() => setLogin(true)} onMinhaConta={() => setConta(true)} />
       <main>
         <Hero />
+        <Faixa />
         <Sobre />
         <Servicos onEscolher={escolherServico} />
         <ComoFunciona />
@@ -51,7 +54,7 @@ export default function Site() {
         href={`https://wa.me/${db.config.whatsapp}`}
         target="_blank"
         rel="noreferrer"
-        className="fixed bottom-5 right-5 z-40 h-14 w-14 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
+        className="fixed bottom-5 right-5 z-40 h-14 w-14 rounded-full bg-white text-black flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.5)] hover:scale-110 transition-transform"
         aria-label="Falar no WhatsApp"
       >
         <WhatsApp size={28} />
@@ -59,12 +62,12 @@ export default function Site() {
 
       {/* Selo do esboço: deixa claro que textos, preços e login são provisórios */}
       {seloTeste && (
-        <div className="fixed bottom-5 left-4 z-40 flex items-center gap-2 text-[11px] leading-tight bg-cacau-900/95 backdrop-blur border border-blush-500/40 text-nude-300 pl-3 pr-1 py-1 rounded-full shadow-xl">
+        <div className="fixed bottom-5 left-4 z-40 flex items-center gap-2 text-[11px] leading-tight bg-black/80 backdrop-blur border border-white/15 text-white/60 pl-3 pr-1 py-1 rounded-full shadow-xl">
           <span>
-            <span className="text-blush-300 font-semibold">Esboço</span>
+            <span className="text-white font-semibold">Esboço</span>
             <span className="hidden sm:inline"> · dados, login e pagamento fictícios</span>
           </span>
-          <button onClick={fecharSelo} className="p-1.5 text-nude-400 hover:text-nude-50 cursor-pointer" aria-label="Fechar aviso">
+          <button onClick={fecharSelo} className="p-1.5 text-white/50 hover:text-white cursor-pointer" aria-label="Fechar aviso">
             <X size={14} />
           </button>
         </div>
@@ -73,6 +76,6 @@ export default function Site() {
       <LoginModal aberto={login} onFechar={() => setLogin(false)} />
       <MinhaContaModal aberto={conta} onFechar={() => setConta(false)} onPagarPendencias={setPagar} />
       <PagarPendenciasModal pendencias={pagar} onFechar={() => setPagar(null)} />
-    </>
+    </div>
   )
 }

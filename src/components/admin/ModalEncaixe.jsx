@@ -22,7 +22,7 @@ export default function ModalEncaixe({ dataInicial, horaInicial = '', clienteFix
 
   const { nomes, total, duracao } = itensDe(db.servicos, sel)
   const ocupados = intervalosOcupados(db.agendamentos, data)
-  const horas = gerarSlots(config).filter((h) => slotLivre(config, h, duracao || config.slotMin, ocupados, '0000-00-00'))
+  const horas = gerarSlots(config, data).filter((h) => slotLivre(config, data, h, duracao || config.slotMin, ocupados, true))
   const sugestoes = busca.length >= 2 ? db.clientes.filter((c) => c.nome.toLowerCase().includes(busca.toLowerCase()) || (c.telefone || '').includes(busca)).slice(0, 5) : []
 
   const salvar = () => {

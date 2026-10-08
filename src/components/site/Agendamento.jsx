@@ -47,7 +47,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
   const { itens, nomes, total, duracao } = itensDe(servicos, selecionados)
 
   const dias = useMemo(() => proximosDias(config.diasAgendaAberta), [config])
-  const slots = useMemo(() => gerarSlots(config), [config])
+  const slots = useMemo(() => (data ? gerarSlots(config, data) : []), [config, data])
   const ocupados = useMemo(() => (data ? intervalosOcupados(db.agendamentos, data) : []), [db.agendamentos, data])
   const diaFechado = (iso) => db.agendamentos.some((a) => a.data === iso && a.status === 'bloqueio' && a.diaInteiro)
   const confirmado = confirmadoId ? db.agendamentos.find((a) => a.id === confirmadoId) : null
@@ -61,7 +61,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
   const confirmar = () => {
     if (telefone.replace(/\D/g, '').length < 11) return setErro('Informe um WhatsApp válido.')
     // revalida o horário (outra cliente pode ter pego enquanto escolhia)
-    if (!slotLivre(config, hora, duracao, intervalosOcupados(db.agendamentos, data), data)) {
+    if (!slotLivre(config, data, hora, duracao, intervalosOcupados(db.agendamentos, data))) {
       setHora(null)
       return setErro('Ops! Esse horário acabou de ser ocupado.')
     }
@@ -88,7 +88,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
   let conteudo
   if (!usuario) {
     conteudo = (
-      <div className="max-w-md mx-auto text-center py-12 bg-white border border-nude-200 rounded-3xl px-6 shadow-xl shadow-blush-700/5">
+      <div className="max-w-md mx-auto text-center py-12 bg-superficie border border-nude-200 rounded-3xl px-6 shadow-xl shadow-blush-700/5">
         <span className="h-14 w-14 rounded-full bg-blush-100 text-blush-600 flex items-center justify-center mx-auto mb-5"><Lock size={24} /></span>
         <h3 className="font-display text-3xl text-cacau-900 font-semibold mb-2">Entre para agendar</h3>
         <p className="text-cacau-600 mb-8 text-sm leading-relaxed">É rapidinho: entre com sua conta Google. Assim você acompanha e cancela seus horários quando precisar.</p>
@@ -108,7 +108,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
     const pend = pendenciasAbertasDe(db, usuario.id)
     const devido = pend.reduce((s, m) => s + m.valor, 0)
     conteudo = (
-      <div className="max-w-lg mx-auto text-center py-10 bg-white border border-nude-200 rounded-3xl px-6 shadow-xl shadow-blush-700/5">
+      <div className="max-w-lg mx-auto text-center py-10 bg-superficie border border-nude-200 rounded-3xl px-6 shadow-xl shadow-blush-700/5">
         <ShieldAlert className="mx-auto text-amber-600 mb-4" size={44} />
         <h3 className="font-display text-4xl text-cacau-900 font-semibold mb-3">Agenda bloqueada</h3>
         <p className="text-cacau-600 mb-5">
@@ -123,13 +123,13 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
           ))}
         </ul>
         <div className="font-label uppercase tracking-[0.25em] text-xs text-cacau-500 mb-1">Total em aberto</div>
-        <div className="font-display text-5xl font-semibold text-amber-700 mb-6">{brl(devido)}</div>
+        <div className="font-display text-5xl font-semibold text-amber-400 mb-6">{brl(devido)}</div>
         <button onClick={() => onPagarPendencias(pend)} className="btn-primary"><QrCode size={16} /> Pagar com Pix</button>
         <p className="text-xs text-cacau-500 mt-4">Assim que o pagamento for confirmado, sua agenda é liberada na hora.</p>
       </div>
     )
   } else {
-    const livres = data ? slots.filter((h) => slotLivre(config, h, duracao, ocupados, data)) : []
+    const livres = data ? slots.filter((h) => slotLivre(config, data, h, duracao, ocupados)) : []
     conteudo = (
       <div className="grid lg:grid-cols-[1fr_340px] gap-8 lg:gap-10 items-start">
         <div className="space-y-8 min-w-0">
@@ -144,7 +144,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
                 {dias.map((iso) => {
                   const lotado =
                     diaAberto(config, iso) &&
-                    !slots.some((h) => slotLivre(config, h, duracao, intervalosOcupados(db.agendamentos, iso), iso))
+                    !gerarSlots(config, iso).some((h) => slotLivre(config, iso, h, duracao, intervalosOcupados(db.agendamentos, iso)))
                   const fechado = !diaAberto(config, iso) || diaFechado(iso) || lotado
                   const d = fromISO(iso)
                   const on = data === iso
@@ -155,7 +155,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
                       title={lotado ? 'Sem horários livres' : undefined}
                       onClick={() => { setData(iso); setHora(null) }}
                       className={`shrink-0 w-14 py-2.5 rounded-2xl border flex flex-col items-center transition-all cursor-pointer disabled:cursor-not-allowed ${
-                        on ? 'bg-cacau-900 border-cacau-900 text-nude-50' : fechado ? 'border-transparent text-nude-400' : 'bg-white border-nude-300 text-cacau-800 hover:border-blush-500'
+                        on ? 'bg-cacau-900 border-cacau-900 text-nude-50' : fechado ? 'border-transparent text-nude-400' : 'bg-superficie border-nude-300 text-cacau-800 hover:border-blush-500'
                       }`}
                     >
                       <span className="text-[10px] uppercase tracking-wider">{DIAS_CURTOS[d.getDay()]}</span>
@@ -191,7 +191,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
                               : coberto
                                 ? 'bg-blush-100 border-blush-300 text-blush-700'
                                 : livre
-                                  ? 'bg-white border-nude-300 text-cacau-800 hover:border-blush-500'
+                                  ? 'bg-superficie border-nude-300 text-cacau-800 hover:border-blush-500'
                                   : 'border-transparent text-nude-400 line-through'
                           }`}
                         >
@@ -217,7 +217,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
         </div>
 
         {/* Resumo */}
-        <aside className="lg:sticky lg:top-28 bg-white border border-nude-200 rounded-3xl p-6 shadow-xl shadow-blush-700/5">
+        <aside className="lg:sticky lg:top-28 bg-superficie border border-nude-200 rounded-3xl p-6 shadow-xl shadow-blush-700/5">
           <h3 className="font-display text-2xl font-semibold text-cacau-900 mb-4">Seu horário</h3>
           {itens.length === 0 ? (
             <p className="text-sm text-cacau-500">Escolha um serviço para começar.</p>
@@ -234,7 +234,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
                       <div className="flex items-center gap-2 text-sm mt-0.5">
                         <span className="flex-1 text-cacau-800">{it.nome}</span>
                         <span className="text-cacau-600 tabular-nums whitespace-nowrap">{brl(it.preco)}</span>
-                        <button onClick={() => escolher(selecionados.filter((v) => v !== it.vid))} className="p-1 -mr-1 rounded-full text-cacau-500 hover:text-red-600 hover:bg-red-50 cursor-pointer" aria-label={`Remover ${it.nome}`}>
+                        <button onClick={() => escolher(selecionados.filter((v) => v !== it.vid))} className="p-1 -mr-1 rounded-full text-cacau-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer" aria-label={`Remover ${it.nome}`}>
                           <X size={14} />
                         </button>
                       </div>
@@ -259,7 +259,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
               <input className="input" type="tel" value={telefone} onChange={(e) => setTelefone(telefoneMask(e.target.value))} placeholder="(31) 99999-9999" />
             </div>
           )}
-          {erro && <p className="flex items-center gap-2 text-sm text-red-600 mt-3"><AlertCircle size={15} className="shrink-0" /> {erro}</p>}
+          {erro && <p className="flex items-center gap-2 text-sm text-red-400 mt-3"><AlertCircle size={15} className="shrink-0" /> {erro}</p>}
           <button onClick={confirmar} disabled={!itens.length || !data || !hora} className="btn-primary w-full mt-5">Confirmar</button>
           <p className="text-[11px] text-cacau-500 mt-3 text-center">
             Paga no dia · cancele grátis até {config.antecedenciaCancelHoras}h antes · falta gera multa de {config.multaPct}%
@@ -283,12 +283,12 @@ function Confirmado({ ag, config, onNovo }) {
   const msg = encodeURIComponent(`Oi, Ana! Acabei de agendar pelo site:\n${ag.servicoNomes}\n${dataLonga(ag.data)} às ${ag.hora}\nNome: ${ag.clienteNome}`)
   return (
     <div className="text-center py-6 max-w-md mx-auto animate-fade-up">
-      <div className="h-16 w-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-5">
-        <CalendarCheck2 className="text-emerald-600" size={30} />
+      <div className="h-16 w-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-5">
+        <CalendarCheck2 className="text-emerald-400" size={30} />
       </div>
       <h3 className="font-display text-4xl text-cacau-900 font-semibold mb-2">Horário confirmado!</h3>
       <p className="text-cacau-600 mb-6">Obrigada, {primeiroNome(ag.clienteNome)}! Te espero no dia e horário abaixo.</p>
-      <div className="bg-white border border-nude-200 rounded-2xl p-5 text-left space-y-2 mb-6">
+      <div className="bg-superficie border border-nude-200 rounded-2xl p-5 text-left space-y-2 mb-6">
         <Linha k="Serviço" v={ag.servicoNomes} />
         <Linha k="Data" v={dataLonga(ag.data)} />
         <Linha k="Horário" v={`${ag.hora} às ${fromMin(toMin(ag.hora) + ag.duracao)}`} />
@@ -298,7 +298,7 @@ function Confirmado({ ag, config, onNovo }) {
         Venha sem maquiagem nos olhos. Precisa desmarcar? Cancele em "Meus horários" até {config.antecedenciaCancelHoras}h antes. Faltas sem aviso geram multa de {config.multaPct}%.
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
-        <a href={`https://wa.me/${config.whatsapp}?text=${msg}`} target="_blank" rel="noreferrer" className="btn !bg-[#25D366] text-white hover:!brightness-95"><WhatsApp size={16} /> Avisar a Ana</a>
+        <a href={`https://wa.me/${config.whatsapp}?text=${msg}`} target="_blank" rel="noreferrer" className="btn bg-white text-black hover:bg-white/85"><WhatsApp size={16} /> Avisar a Ana</a>
         <button onClick={onNovo} className="btn-ghost">Agendar outro</button>
       </div>
     </div>

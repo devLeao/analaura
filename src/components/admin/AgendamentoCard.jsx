@@ -109,7 +109,7 @@ function ModaisAgendamento({ acao, onFechar }) {
   const horasLivres = useMemo(() => {
     if (acao?.tipo !== 'editar') return []
     const oc = intervalosOcupados(db.agendamentos, data, ag.id)
-    return gerarSlots(db.config).filter((h) => slotLivre(db.config, h, novaDur || db.config.slotMin, oc, '0000-00-00'))
+    return gerarSlots(db.config, data).filter((h) => slotLivre(db.config, data, h, novaDur || db.config.slotMin, oc, true))
   }, [acao, db, data, novaDur, ag])
 
   if (!acao || !ag) return null

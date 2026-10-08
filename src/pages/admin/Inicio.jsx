@@ -10,7 +10,7 @@ import FichaCliente from '../../components/admin/FichaCliente'
 import { WhatsApp } from '../../components/ui/Icones'
 import { calcularStats, variacao, manutencaoVencendo, aniversariantes } from '../../lib/stats'
 import { brl, toISO, addDays, DIAS_CURTOS, fromISO, dataCurta, toMin, primeiroNome, dataLonga } from '../../lib/format'
-import { diaAberto } from '../../lib/schedule'
+import { diaAberto, horarioDo, almocoDe } from '../../lib/schedule'
 
 export default function Inicio() {
   const { db } = useStore()
@@ -34,9 +34,11 @@ export default function Inicio() {
 
   // Ocupação dos próximos 7 dias abertos
   const prox7 = Array.from({ length: 7 }, (_, i) => toISO(addDays(agora, i))).filter((iso) => diaAberto(config, iso))
-  const minDia = toMin(config.fecha) - toMin(config.abre) - (toMin(config.almocoFim) - toMin(config.almocoInicio))
+  // minutos de expediente de cada dia (cada dia tem o seu horário)
+  const pausa = almocoDe(config)
+  const minDia = (iso) => { const h = horarioDo(config, iso); return toMin(h.fecha) - toMin(h.abre) - (pausa ? pausa[1] - pausa[0] : 0) }
   const minOcup = db.agendamentos.filter((a) => prox7.includes(a.data) && a.status === 'agendado').reduce((s, a) => s + a.duracao, 0)
-  const ocupacao = prox7.length ? Math.min(1, minOcup / (minDia * prox7.length)) : 0
+  const ocupacao = prox7.length ? Math.min(1, minOcup / prox7.reduce((s, iso) => s + minDia(iso), 0)) : 0
 
   const ultimos7 = calcularStats(db, toISO(addDays(agora, -6)), hoje).porDia
 

@@ -39,7 +39,7 @@ export function LoginModal({ aberto, onFechar }) {
         <div className="space-y-1">
           {demo && <Conta onClick={() => entrarComoCliente(demo.id)} avatar={iniciais(demo.nome)} titulo={demo.nome} sub={`${demo.email} · tem histórico, manutenção vencendo`} />}
           {devedora && (
-            <Conta onClick={() => entrarComoCliente(devedora.id)} avatar={iniciais(devedora.nome)} titulo={devedora.nome} sub={`${devedora.email} · tem multa por falta`} destaque="bg-amber-50 text-amber-800" />
+            <Conta onClick={() => entrarComoCliente(devedora.id)} avatar={iniciais(devedora.nome)} titulo={devedora.nome} sub={`${devedora.email} · tem multa por falta`} destaque="bg-amber-500/15 text-amber-300" />
           )}
           <Conta onClick={entrarComoAdmin} avatar={<Crown size={16} />} titulo="Ana Laura (administradora)" sub="Acesso ao painel" destaque="bg-cacau-900 text-blush-200" />
           <button onClick={() => setNovo(true)} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-nude-100 text-left text-cacau-600 text-sm cursor-pointer">
@@ -125,10 +125,10 @@ export function PagarPendenciasModal({ pendencias, onFechar }) {
 // Meus horários (área da cliente)
 // ---------------------------------------------------------------------------
 const STATUS_INFO = {
-  agendado: ['Agendado', 'text-violet-800 border-violet-200 bg-violet-50'],
-  concluido: ['Concluído', 'text-emerald-800 border-emerald-200 bg-emerald-50'],
+  agendado: ['Agendado', 'text-violet-300 border-violet-500/30 bg-violet-500/10'],
+  concluido: ['Concluído', 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10'],
   cancelado: ['Cancelado', 'text-cacau-600 border-nude-300 bg-nude-100'],
-  falta: ['Falta', 'text-red-700 border-red-200 bg-red-50'],
+  falta: ['Falta', 'text-red-300 border-red-500/30 bg-red-500/10'],
 }
 
 export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
@@ -146,7 +146,7 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
   return (
     <Modal aberto onFechar={onFechar} titulo="Meus horários" sub={`Olá, ${usuario.nome.split(' ')[0]}!`} largura="max-w-lg">
       {pendencias.length > 0 && (
-        <div className="mb-5 border border-amber-200 bg-amber-50 rounded-2xl p-4 flex gap-3">
+        <div className="mb-5 border border-amber-500/30 bg-amber-500/10 rounded-2xl p-4 flex gap-3">
           <AlertTriangle className="text-amber-600 shrink-0" size={20} />
           <div className="flex-1">
             <p className="text-sm text-cacau-900 font-medium">Pendência em aberto: {brl(pendencias.reduce((s, m) => s + m.valor, 0))}</p>
@@ -174,7 +174,7 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
                   <div className="text-xs text-cacau-500 mt-0.5">{a.hora} · {brl(a.total)} no dia</div>
                 </div>
                 {podeCancelar ? (
-                  <button onClick={() => setConfirmar(a)} className="p-2 text-cacau-500 hover:text-red-600 hover:bg-red-50 rounded-full cursor-pointer" title="Cancelar horário">
+                  <button onClick={() => setConfirmar(a)} className="p-2 text-cacau-500 hover:text-red-400 hover:bg-red-500/10 rounded-full cursor-pointer" title="Cancelar horário">
                     <CalendarX2 size={18} />
                   </button>
                 ) : (

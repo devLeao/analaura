@@ -1,28 +1,39 @@
 import { toISO, addDays, uid, toMin, fromMin, pad, multaDe } from '../lib/format'
-import { slotLivre } from '../lib/schedule'
+import { slotLivre, horarioDo, diaAberto } from '../lib/schedule'
 import { itensDe, montarVid, lerVid } from '../lib/catalogo'
 
 // ---------------------------------------------------------------------------
-// Dados do esboço. Serviços e preços vieram da Ana; o que está marcado com
-// "A CONFIRMAR" ainda falta ela passar. Clientes e agendamentos são FICTÍCIOS.
+// Dados do estúdio. Contato, horários, serviços e preços vieram da Ana; o que
+// está marcado com "A CONFIRMAR" ainda falta ela passar.
+// Clientes e agendamentos são FICTÍCIOS (só para o esboço).
 // ---------------------------------------------------------------------------
 
 export { CATEGORIAS } from '../lib/catalogo'
 
 export const CONFIG_PADRAO = {
-  marca: 'Ana Laura', // A CONFIRMAR: nome do estúdio
-  slogan: 'Lash & Brow',
-  whatsapp: '5531900000000', // A CONFIRMAR
-  instagram: 'analaura.lash', // A CONFIRMAR
-  endereco: 'Rua Exemplo, 123 — Sala 2', // A CONFIRMAR
-  cidade: 'Belo Horizonte - MG', // A CONFIRMAR
+  marca: 'Laura Célvio',
+  slogan: 'Lash Designer',
+  frase: 'Praticidade, beleza e cuidado em um só lugar.',
+  fraseServicos: 'Do natural ao marcante, técnicas personalizadas para um resultado que combina com você.',
+  whatsapp: '5531997830336',
+  instagram: 'studiolauracelvio',
+  endereco: 'Rua Geraldo Ilídio Teixeira, 784',
+  cidade: '', // A CONFIRMAR: bairro / cidade
 
-  abre: '09:00',
-  fecha: '19:00',
-  almocoInicio: '12:00',
-  almocoFim: '13:00',
+  // Horário por dia da semana (0 = domingo). Dia sem horário = fechado.
+  horarios: {
+    0: null,
+    1: null,
+    2: ['08:00', '18:30'],
+    3: ['08:00', '18:30'],
+    4: ['08:00', '18:30'],
+    5: ['08:00', '18:30'],
+    6: ['07:00', '15:00'],
+  },
+  // Pausa opcional (deixe vazio se não tiver)
+  almocoInicio: '',
+  almocoFim: '',
   slotMin: 30,
-  diasAbertos: [1, 2, 3, 4, 5, 6], // seg a sáb
   diasAgendaAberta: 21,
 
   // Igual ao Arian: sem sinal. Cancelamento grátis até X horas antes; falta gera multa.
@@ -30,45 +41,48 @@ export const CONFIG_PADRAO = {
   multaPct: 50,
 
   // Pix para a cliente pagar multas/pendências pelo site
-  pixChave: 'analaura@exemplo.com', // A CONFIRMAR
-  pixNome: 'Ana Laura',
-  pixCidade: 'Belo Horizonte',
+  pixChave: '60294908000187', // CNPJ
+  pixNome: 'Laura Celvio', // A CONFIRMAR: nome exato do titular do CNPJ
+  pixCidade: 'Belo Horizonte', // A CONFIRMAR
 }
 
 // Cílios: intensidade 1 (mais natural) a 5 (mais cheio) e "leque" (fios no desenho) são estimativas.
-// Durações e as manutenções marcadas com "A CONFIRMAR" ainda precisam vir da Ana.
+// A duração da manutenção (90 min) ainda precisa ser confirmada pela Ana.
 const manut = (preco, dias = 21, diasMin = null) => ({ preco, duracao: 90, dias, diasMin })
+const foto = (nome) => `/img/servicos/${nome}.webp`
 
 export const SERVICOS = [
   { id: 'brasileiro', categoria: 'cilios', nome: 'Volume Brasileiro', preco: 125, duracao: 120, intensidade: 2, leque: 2, marrom: true, manutencao: manut(85), // manutenção A CONFIRMAR
     desc: 'Ideal para quem busca cílios mais volumosos sem perder a naturalidade. Fios em formato de Y. Disponível em tom claro e escuro de marrom.' },
-  { id: 'sirena', categoria: 'cilios', nome: 'Efeito Sirena', preco: 115, duracao: 120, intensidade: 2, leque: 2, marrom: true, manutencao: manut(75, 18, 15),
+  { id: 'sirena', categoria: 'cilios', nome: 'Efeito Sirena', preco: 115, duracao: 90, intensidade: 2, leque: 2, marrom: true, manutencao: manut(75, 18, 15), foto: foto('sirena'),
     desc: 'A escolha perfeita pra você que gosta de um olhar alongado e delicado, com o charme do efeito sereia.' },
-  { id: 'egipcio', categoria: 'cilios', nome: 'Volume Egípcio', preco: 135, duracao: 150, intensidade: 3, leque: 3, marrom: true, manutencao: manut(90),
+  { id: 'egipcio', categoria: 'cilios', nome: 'Volume Egípcio', preco: 135, duracao: 120, intensidade: 3, leque: 3, marrom: true, manutencao: manut(90),
     desc: 'A escolha perfeita para quem ama um olhar marcado e cheio, com fios em formato de W (3D).' },
-  { id: 'angel', categoria: 'cilios', nome: 'Volume Angel', preco: 135, duracao: 150, intensidade: 3, leque: 3, marrom: false, manutencao: manut(90), // manutenção A CONFIRMAR
+  { id: 'angel', categoria: 'cilios', nome: 'Volume Angel', preco: 135, duracao: 120, intensidade: 3, leque: 3, marrom: false, manutencao: manut(90), // manutenção A CONFIRMAR
     desc: 'Volume, leveza e definição na medida certa, para um olhar angelical e iluminado.' },
-  { id: 'glamour', categoria: 'cilios', nome: 'Volume Glamour', preco: 135, duracao: 150, intensidade: 4, leque: 4, marrom: true, manutencao: manut(90),
+  { id: 'glamour', categoria: 'cilios', nome: 'Volume Glamour', preco: 135, duracao: 120, intensidade: 4, leque: 4, marrom: true, manutencao: manut(90), foto: foto('glamour'),
     desc: 'Perfeito para quem ama um olhar intenso e glamouroso, com bastante volume.' },
-  { id: 'fox', categoria: 'cilios', nome: 'Efeito Fox', preco: 150, duracao: 150, intensidade: 4, leque: 3, marrom: true, manutencao: manut(100),
+  { id: 'fox', categoria: 'cilios', nome: 'Efeito Fox', preco: 150, duracao: 120, intensidade: 4, leque: 3, marrom: true, manutencao: manut(100), foto: foto('fox'),
     desc: 'Técnica perfeita para quem ama um olhar puxado e alongado, o famoso "olho de raposa", com efeito delineado.' },
-  { id: 'luxo', categoria: 'cilios', nome: 'Volume Luxo', preco: 145, duracao: 150, intensidade: 5, leque: 5, marrom: false, manutencao: manut(95), // manutenção A CONFIRMAR
+  { id: 'luxo', categoria: 'cilios', nome: 'Volume Luxo', preco: 145, duracao: 120, intensidade: 5, leque: 5, marrom: false, manutencao: manut(95), // manutenção A CONFIRMAR
     desc: 'Para quem ama um olhar marcante e sofisticado, com volume denso e acabamento impecável.' },
-  { id: 'power', categoria: 'cilios', nome: 'Volume Glamour (Power)', preco: 170, duracao: 180, intensidade: 5, leque: 6, marrom: false, manutencao: manut(110), // manutenção A CONFIRMAR
+  { id: 'power', categoria: 'cilios', nome: 'Volume Glamour (Power)', preco: 170, duracao: 180, intensidade: 5, leque: 6, marrom: false, manutencao: manut(110), foto: foto('power'), // manutenção A CONFIRMAR
     desc: 'São colocados dois fios sintéticos 4D em cada fio natural: o volume mais intenso do estúdio.' },
 
-  { id: 'design', categoria: 'sobrancelhas', nome: 'Design Personalizado', preco: 30, duracao: 30, desenho: 'design',
+  { id: 'design', categoria: 'sobrancelhas', nome: 'Design Personalizado', preco: 30, duracao: 30, desenho: 'design', foto: foto('design'),
     desc: 'O design personalizado tem o objetivo de valorizar o seu rosto, respeitando o formato natural das suas sobrancelhas.' },
-  { id: 'henna', categoria: 'sobrancelhas', nome: 'Design com Henna', preco: 40, duracao: 45, desenho: 'henna',
+  { id: 'henna', categoria: 'sobrancelhas', nome: 'Design com Henna', preco: 40, duracao: 60, desenho: 'henna', foto: foto('henna'),
     desc: 'O design com henna proporciona preenchimento das falhas e um contorno bem marcado, que dura na pele por vários dias.' },
-  { id: 'tintura', categoria: 'sobrancelhas', nome: 'Design com Tintura', preco: 40, duracao: 45, desenho: 'henna',
+  { id: 'tintura', categoria: 'sobrancelhas', nome: 'Design com Tintura', preco: 40, duracao: 60, desenho: 'henna', // duração A CONFIRMAR
     desc: 'Diferente da henna, a tintura tem ação nos fios: cor uniforme e efeito natural, sem marcar a pele.' },
-  { id: 'lamination', categoria: 'sobrancelhas', nome: 'Brow Lamination', preco: 100, duracao: 60, desenho: 'lamination',
+  { id: 'lamination', categoria: 'sobrancelhas', nome: 'Brow Lamination', preco: 100, duracao: 90, desenho: 'lamination', foto: foto('lamination'),
     desc: 'A Brow Lamination alinha e fixa os fios, deixando as sobrancelhas mais volumosas e disciplinadas por semanas.' },
+  { id: 'lamination-tintura', categoria: 'sobrancelhas', nome: 'Brow Lamination com Tintura', preco: 110, duracao: 90, desenho: 'lamination', foto: foto('lamination'),
+    desc: 'A Brow Lamination com tintura nos fios: além de alinhados e volumosos, ficam com a cor mais uniforme e marcada.' },
 
-  { id: 'remocao', categoria: 'remocao', nome: 'Remoção Química', preco: 20, duracao: 30,
+  { id: 'remocao', categoria: 'remocao', nome: 'Remoção Química', preco: 20, duracao: 20,
     desc: 'Utilizo um produto específico que dissolve a cola sem agredir os fios naturais.' },
-].map((s, i) => ({ manutencao: null, marrom: false, ...s, ativo: true, ordem: i }))
+].map((s, i) => ({ manutencao: null, marrom: false, foto: null, ...s, ativo: true, ordem: i }))
 
 const NOMES = [
   'Ana Beatriz Lima', 'Bruna Carvalho', 'Camila Ferreira', 'Carolina Duarte', 'Daniela Prado', 'Fernanda Lopes',
@@ -96,7 +110,7 @@ function sortear(r, pesos) {
 }
 
 const ESTILOS = [['brasileiro', 8], ['egipcio', 4], ['sirena', 4], ['angel', 3], ['glamour', 6], ['fox', 5], ['luxo', 3], ['power', 2]]
-const SOBRANCELHA = [['design', 45], ['henna', 25], ['tintura', 15], ['lamination', 15]]
+const SOBRANCELHA = [['design', 45], ['henna', 25], ['tintura', 12], ['lamination', 12], ['lamination-tintura', 6]]
 const VISITAS = [['cilios', 58], ['sobrancelha', 24], ['cilios+sobrancelha', 14], ['remocao', 4]]
 const FORMAS = [['pix', 55], ['cartao', 30], ['dinheiro', 15]]
 
@@ -216,18 +230,19 @@ export function gerarSeed() {
   for (let off = -95; off <= 14; off++) {
     const dia = addDays(hojeD, off)
     const iso = toISO(dia)
-    if (!config.diasAbertos.includes(dia.getDay())) continue
+    if (!diaAberto(config, iso)) continue
     let ocupacao = dia.getDay() >= 4 ? 0.7 : 0.5 // quinta a sábado mais cheio
     if (off > 0) ocupacao *= Math.max(0.12, 0.6 - off / 18) // futuro mais vazio: ainda tem horário pra agendar
 
-    let t = toMin(config.abre)
-    while (t < toMin(config.fecha)) {
+    const { abre, fecha } = horarioDo(config, iso)
+    let t = toMin(abre)
+    while (t < toMin(fecha)) {
       if (r() > ocupacao) { t += 30; continue }
       // uma cliente não aparece duas vezes no mesmo dia
       let cliente = sorteaveis[Math.floor(r() * sorteaveis.length)]
       while (agendamentos.some((x) => x.data === iso && x.clienteId === cliente.id)) cliente = sorteaveis[Math.floor(r() * sorteaveis.length)]
       const ag = montarAgendamento(cliente, visitaDe(cliente, iso), iso, fromMin(t), 'agendado')
-      if (!slotLivre(config, ag.hora, ag.duracao, [], '0000-00-00')) { t += 30; continue }
+      if (!slotLivre(config, iso, ag.hora, ag.duracao, [], true)) { t += 30; continue }
 
       const passou = off < 0 || (off === 0 && t + ag.duracao < agoraMin)
       ag.criadoEm = toISO(addDays(dia, -1 - Math.floor(r() * 8)))
@@ -256,7 +271,7 @@ export function gerarSeed() {
 
   const proximoAberto = (off) => {
     let d = addDays(hojeD, off)
-    while (!config.diasAbertos.includes(d.getDay())) d = addDays(d, -1)
+    while (!diaAberto(config, toISO(d))) d = addDays(d, -1)
     return toISO(d)
   }
   const livreNoDia = (iso, hora, dur) =>
@@ -283,7 +298,7 @@ export function gerarSeed() {
   for (const c of clientes) { delete c._estilo; delete c._marrom }
 
   return {
-    versao: 2,
+    versao: 3,
     config,
     servicos: SERVICOS,
     clientes,

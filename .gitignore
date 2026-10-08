@@ -1,3 +1,6 @@
 node_modules
 dist
 .env*
+
+# Fotos originais em alta (o site usa as versões otimizadas em public/img)
+assets-originais/

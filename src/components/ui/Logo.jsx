@@ -1,19 +1,25 @@
 import { useStore } from '../../store/Store'
 
-// Logo provisório até recebermos a identidade visual do estúdio.
-export default function Logo({ className = '', claro = false }) {
+/**
+ * Logotipo da Laura Célvio: monograma LC (imagem do PDF original) + nome.
+ * `claro` = versão branca, para fundo escuro (site).
+ */
+export default function Logo({ className = '', claro = false, compacto = false }) {
   const { config } = useStore().db
   return (
     <div className={`flex items-center gap-3 select-none ${className}`}>
-      <svg viewBox="0 0 48 48" className="h-11 w-11 shrink-0" aria-hidden="true">
-        <circle cx="24" cy="24" r="22.5" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-blush-500" />
-        <text x="24" y="29.5" textAnchor="middle" fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontWeight="600" fontSize="17" className={claro ? 'fill-nude-50' : 'fill-cacau-900'}>AL</text>
-        <path d="M15 34.5q9 4.5 18 0" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" className="text-blush-500" />
-      </svg>
-      <div className="leading-none">
-        <div className={`font-display font-semibold text-2xl ${claro ? 'text-nude-50' : 'text-cacau-900'}`}>{config.marca}</div>
-        <div className="font-label text-[10px] tracking-[0.4em] uppercase text-blush-600 mt-1">{config.slogan}</div>
-      </div>
+      <img src={claro ? '/img/logo-monograma-branco.png' : '/img/logo-monograma-preto.png'} alt="" className="h-10 w-auto shrink-0" />
+      {!compacto && (
+        <div className="leading-none">
+          <div className={`font-marca text-[17px] tracking-[0.12em] uppercase ${claro ? 'text-white' : 'text-cacau-900'}`}>{config.marca}</div>
+          <div className={`font-label text-[9px] tracking-[0.5em] uppercase mt-1.5 ${claro ? 'text-white/60' : 'text-cacau-500'}`}>{config.slogan}</div>
+        </div>
+      )}
     </div>
   )
 }
+
+/** Logotipo completo (monograma em cima, nome embaixo), para capa e rodapé. */
+export const LogoCompleto = ({ claro = true, className = '' }) => (
+  <img src={claro ? '/img/logo-completo-branco.png' : '/img/logo-completo-preto.png'} alt="Laura Célvio · Lash Designer" className={className} />
+)

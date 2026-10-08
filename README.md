@@ -1,8 +1,8 @@
-# Ana Laura · Lash & Brow — esboço
+# Laura Célvio · Lash Designer — esboço
 
 Site + painel administrativo do estúdio de extensão de cílios e sobrancelhas.
-**Esboço:** os serviços e preços são os da Ana; contato, fotos, login e clientes ainda são fictícios. Tudo fica salvo
-no navegador (localStorage); nada vai para servidor.
+**Esboço:** serviços, preços, horários, contato, fotos e logotipo já são os da Ana; login, pagamento e clientes
+ainda são fictícios. Tudo fica salvo no navegador (localStorage); nada vai para servidor.
 
 ## Rodar
 
@@ -21,12 +21,20 @@ npm run build      # gera /dist (vercel.json já configurado)
   - **Ana Laura (administradora)**: acesso ao painel
 - Para recriar os dados de exemplo: Painel → Configurações → Recriar dados de exemplo.
 
+## Visual
+
+- Paleta preto e cinza (pedido da Ana): o **site é escuro** e o **painel é claro**, com a mesma paleta
+  (`src/index.css`, classe `tema-escuro`).
+- Capa com as fotos trocando sozinhas (preto e branco, zoom lento) e o logotipo LC no centro.
+- Fotos em `public/img` (WebP otimizado). Os arquivos originais ficam em `assets-originais/`, fora do site.
+- Para trocar a foto de um serviço: Painel → Serviços → editar → "Foto do card".
+
 ## Serviços e manutenção
 
 - **Cílios:** 8 modelos. Cada um tem a **própria manutenção** (preço e prazo) e alguns também são feitos em **marrom** (mesmo preço).
-  No site é um card por modelo, com aplicação e manutenção lado a lado; ao agendar, a cliente escolhe
-  o modelo e depois "Aplicação/Manutenção" e "Preto/Marrom".
-- **Sobrancelhas:** Design Personalizado, Henna, Tintura e Brow Lamination.
+  No site é um card por modelo, com aplicação e manutenção lado a lado. Ao agendar, a cliente escolhe
+  Aplicação/Manutenção/Remoção e o modelo; a cor é combinada no atendimento.
+- **Sobrancelhas:** Design Personalizado, Henna, Tintura, Brow Lamination e Brow Lamination com Tintura.
 - **Remoção Química.**
 - Internamente o agendamento guarda um id de variação (`fox.marrom.manutencao`), veja `src/lib/catalogo.js`.
 
@@ -65,10 +73,10 @@ src/
 
 ## A confirmar com a Ana
 
-Tudo marcado com `A CONFIRMAR` em `src/data/seed.js`: nome do estúdio, WhatsApp, Instagram,
-endereço, chave Pix, durações dos serviços, preço da manutenção do Volume Brasileiro, Angel, Luxo e Power
-(estimados), descrições completas, horário de funcionamento e regras de cancelamento/multa.
-Os desenhos de cílios (`FotoPlaceholder`) viram fotos reais.
+Tudo marcado com `A CONFIRMAR` em `src/data/seed.js`: bairro/cidade, nome do titular do Pix (CNPJ),
+preço da manutenção do Volume Brasileiro, Angel, Luxo e Power (estimados), duração das manutenções (90 min)
+e da Design com Tintura, e as regras de cancelamento/multa.
+Faltam fotos de: Volume Brasileiro, Egípcio, Angel, Luxo e Design com Tintura (por enquanto mostram o desenho).
 
 ## Fase 2
 

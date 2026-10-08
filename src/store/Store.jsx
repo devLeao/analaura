@@ -9,13 +9,13 @@ import { itensDe } from '../lib/catalogo'
 // mantendo a mesma interface para os componentes.
 // ---------------------------------------------------------------------------
 
-const CHAVE = 'analaura-esboco-v2'
+const CHAVE = 'laura-celvio-v3'
 const StoreContext = createContext(null)
 
 function carregar() {
   try {
     const salvo = JSON.parse(localStorage.getItem(CHAVE))
-    if (salvo?.versao === 2) return salvo
+    if (salvo?.versao === 3) return salvo
   } catch {
     /* sem storage disponível: usa seed */
   }

@@ -1,38 +1,97 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-display: "Cormorant Garamond", Garamond, Georgia, serif;
+  --font-marca: "Cinzel", "Trajan Pro", Georgia, serif;
   --font-label: "Jost", "Helvetica Neue", sans-serif;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: "Jost", "Helvetica Neue", system-ui, sans-serif;
 
-  /* Paleta: nude, cacau e rosé (rose gold) */
-  --color-cacau-950: #1f1715;
-  --color-cacau-900: #2a201d;
-  --color-cacau-800: #3a2d29;
-  --color-cacau-700: #4d3c37;
-  --color-cacau-600: #6b5650;
-  --color-cacau-500: #8a736b;
+  /*
+   * Paleta preto e cinza (pedido da Ana). Os nomes antigos foram mantidos
+   * (cacau = tons de texto/escuros, nude = fundos/bordas, blush = destaque)
+   * para não mexer em todo o código. Aqui fica a versão CLARA, usada no painel.
+   * O site usa a versão ESCURA logo abaixo, em `.tema-escuro`.
+   */
+  --color-cacau-950: #0a0a0a;
+  --color-cacau-900: #171717;
+  --color-cacau-800: #262626;
+  --color-cacau-700: #404040;
+  --color-cacau-600: #525252;
+  --color-cacau-500: #737373;
 
-  --color-nude-50: #fbf7f3;
-  --color-nude-100: #f5ede6;
-  --color-nude-200: #ecdfd4;
-  --color-nude-300: #dcc8b8;
-  --color-nude-400: #c4ab98;
+  --color-nude-50: #fafafa;
+  --color-nude-100: #f4f4f4;
+  --color-nude-200: #e5e5e5;
+  --color-nude-300: #d4d4d4;
+  --color-nude-400: #a3a3a3;
 
-  --color-blush-100: #f6e4dc;
-  --color-blush-200: #efcfc2;
-  --color-blush-300: #e7b8a8;
-  --color-blush-400: #d69a87;
-  --color-blush-500: #c07f6b;
-  --color-blush-600: #a5664f;
-  --color-blush-700: #85503d;
+  --color-blush-100: #f0f0f0;
+  --color-blush-200: #e0e0e0;
+  --color-blush-300: #cccccc;
+  --color-blush-400: #a3a3a3;
+  --color-blush-500: #737373;
+  --color-blush-600: #525252;
+  --color-blush-700: #262626;
+
+  /* fundo de cartões, campos e modais */
+  --color-superficie: #ffffff;
 
   --animate-fade-up: fade-up 0.7s ease-out both;
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(16px); }
     to { opacity: 1; transform: none; }
   }
+  --animate-marquee: marquee 38s linear infinite;
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  --animate-kenburns: kenburns 9s ease-out both;
+  @keyframes kenburns {
+    from { transform: scale(1.12); }
+    to { transform: scale(1); }
+  }
+  --animate-progresso: progresso linear both;
+  @keyframes progresso {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  --animate-flutuar: flutuar 7s ease-in-out infinite;
+  @keyframes flutuar {
+    0%, 100% { transform: translateY(0) rotate(var(--giro, 0deg)); }
+    50% { transform: translateY(-14px) rotate(var(--giro, 0deg)); }
+  }
 }
+
+/* Versão escura (site). Os mesmos nomes, com os valores invertidos. */
+.tema-escuro {
+  --color-cacau-950: #ffffff;
+  --color-cacau-900: #f2f2f2;
+  --color-cacau-800: #e0e0e0;
+  --color-cacau-700: #c4c4c4;
+  --color-cacau-600: #a1a1a1;
+  --color-cacau-500: #7a7a7a;
+
+  --color-nude-50: #0a0a0a;
+  --color-nude-100: #111111;
+  --color-nude-200: #242424;
+  --color-nude-300: #333333;
+  --color-nude-400: #5c5c5c;
+
+  --color-blush-100: #1a1a1a;
+  --color-blush-200: #2b2b2b;
+  --color-blush-300: #3d3d3d;
+  --color-blush-400: #8c8c8c;
+  --color-blush-500: #d9d9d9;
+  --color-blush-600: #b5b5b5;
+  --color-blush-700: #e6e6e6;
+
+  --color-superficie: #141414;
+  color-scheme: dark;
+  background: var(--color-nude-50);
+  color: var(--color-cacau-800);
+}
+html:has(.tema-escuro) body { background: #0a0a0a; }
 
 html { scroll-behavior: smooth; scroll-padding-top: 80px; }
 
@@ -58,8 +117,14 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: 0.06;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Texto só no contorno (faixa LASHES · BROWS e nome gigante do "Sobre") */
+.contorno {
+  color: transparent;
+  -webkit-text-stroke: 1.2px var(--traco, #fff);
 }
 
 @utility btn {
@@ -76,21 +141,49 @@ body {
 }
 
 @utility input {
-  @apply w-full bg-white border border-nude-300 text-cacau-900 px-4 py-3 rounded-xl outline-none focus:border-blush-500 placeholder:text-nude-400 transition-colors;
+  @apply w-full bg-superficie border border-nude-300 text-cacau-900 px-4 py-3 rounded-xl outline-none focus:border-blush-500 placeholder:text-nude-400 transition-colors;
 }
 @utility label {
   @apply block text-xs font-medium text-cacau-600 mb-1.5;
 }
 
-/* Moldura em arco, marca visual do estúdio */
+/* Moldura em arco */
 @utility arco {
   border-radius: 999px 999px 1.25rem 1.25rem;
 }
 
 .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #dcc8b8; border-radius: 3px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-nude-300); border-radius: 3px; }
 
 /* Painel: cartão padrão */
 @utility card {
-  @apply bg-white border border-nude-200 rounded-2xl;
+  @apply bg-superficie border border-nude-200 rounded-2xl;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Volta para a paleta clara dentro do site escuro (capa cinza e menu em cima dela) */
+.tema-claro {
+  --color-cacau-950: #0a0a0a;
+  --color-cacau-900: #171717;
+  --color-cacau-800: #262626;
+  --color-cacau-700: #404040;
+  --color-cacau-600: #525252;
+  --color-cacau-500: #737373;
+  --color-nude-50: #fafafa;
+  --color-nude-100: #f4f4f4;
+  --color-nude-200: #e5e5e5;
+  --color-nude-300: #d4d4d4;
+  --color-nude-400: #a3a3a3;
+  --color-blush-100: #f0f0f0;
+  --color-blush-200: #e0e0e0;
+  --color-blush-300: #cccccc;
+  --color-blush-400: #a3a3a3;
+  --color-blush-500: #737373;
+  --color-blush-600: #525252;
+  --color-blush-700: #262626;
+  --color-superficie: #ffffff;
+  color-scheme: light;
 }

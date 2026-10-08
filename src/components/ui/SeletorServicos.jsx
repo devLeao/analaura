@@ -57,7 +57,7 @@ export default function SeletorServicos({ servicos, sel, onChange, compacto = fa
               key={id}
               type="button"
               onClick={() => setModo(id)}
-              className={`px-3.5 py-1.5 rounded-full text-sm cursor-pointer transition-colors ${modo === id ? 'bg-white text-cacau-900 shadow-sm font-medium' : 'text-cacau-600 hover:text-cacau-900'}`}
+              className={`px-3.5 py-1.5 rounded-full text-sm cursor-pointer transition-colors ${modo === id ? 'bg-superficie text-cacau-900 shadow-sm font-medium' : 'text-cacau-600 hover:text-cacau-900'}`}
             >
               {nome}
             </button>
@@ -122,7 +122,7 @@ function Lista({ opcoes, atual, onEscolher, compacto }) {
             key={o.vid}
             type="button"
             onClick={() => onEscolher(o.vid)}
-            className={`relative overflow-hidden flex items-center gap-3 text-left rounded-2xl border px-4 ${o.cores ? 'pl-7' : ''} ${compacto ? 'py-2' : 'py-3'} cursor-pointer transition-colors ${on ? 'border-cacau-900 bg-white ring-1 ring-cacau-900' : 'border-nude-300 bg-white hover:border-blush-400'}`}
+            className={`relative overflow-hidden flex items-center gap-3 text-left rounded-2xl border px-4 ${o.cores ? 'pl-7' : ''} ${compacto ? 'py-2' : 'py-3'} cursor-pointer transition-colors ${on ? 'border-cacau-900 bg-superficie ring-1 ring-cacau-900' : 'border-nude-300 bg-superficie hover:border-blush-400'}`}
           >
             {/* Listras do tema do modelo, na borda esquerda */}
             {o.cores && (

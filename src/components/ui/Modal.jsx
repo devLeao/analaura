@@ -15,9 +15,9 @@ export default function Modal({ aberto, onFechar, titulo, sub, children, largura
 
   if (!aberto) return null
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-cacau-950/50 backdrop-blur-sm sm:p-4" onMouseDown={onFechar}>
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4" onMouseDown={onFechar}>
       <div
-        className={`w-full ${largura} bg-white border border-nude-200 sm:rounded-3xl rounded-t-3xl shadow-2xl max-h-[92vh] flex flex-col animate-fade-up text-cacau-800`}
+        className={`w-full ${largura} bg-superficie border border-nude-200 sm:rounded-3xl rounded-t-3xl shadow-2xl max-h-[92vh] flex flex-col animate-fade-up text-cacau-800`}
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

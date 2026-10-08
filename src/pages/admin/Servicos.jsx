@@ -9,7 +9,19 @@ import Modal from '../../components/ui/Modal'
 import { CATEGORIAS, prazoLabel } from '../../lib/catalogo'
 import { brl, duracaoLabel } from '../../lib/format'
 
-const NOVO = { nome: '', categoria: 'cilios', preco: 0, duracao: 120, desc: '', ativo: true, intensidade: 3, leque: 3, marrom: false, manutencao: { preco: 0, duracao: 90, dias: 21, diasMin: null }, desenho: 'design' }
+const NOVO = { nome: '', categoria: 'cilios', preco: 0, duracao: 120, desc: '', ativo: true, intensidade: 3, leque: 3, marrom: false, manutencao: { preco: 0, duracao: 90, dias: 21, diasMin: null }, desenho: 'design', foto: null }
+
+// Fotos que já estão no site (public/img/servicos). Para uma foto nova, basta colocar o arquivo lá e incluir aqui.
+const FOTOS = [
+  ['/img/servicos/fox.webp', 'Efeito Fox'],
+  ['/img/servicos/glamour.webp', 'Volume Glamour'],
+  ['/img/servicos/power.webp', 'Glamour Power'],
+  ['/img/servicos/sirena.webp', 'Efeito Sirena'],
+  ['/img/servicos/lamination.webp', 'Brow Lamination'],
+  ['/img/servicos/henna.webp', 'Henna'],
+  ['/img/servicos/design.webp', 'Design'],
+  ['/img/capa/modelo.webp', 'Modelo'],
+]
 
 const Desenho = ({ s, className }) =>
   s.categoria === 'sobrancelhas' ? <Sobrancelha variante={s.desenho || 'design'} className={className} /> : <Olho leque={s.leque || 1} className={className} />
@@ -39,8 +51,8 @@ export default function Servicos() {
                       <button onClick={() => moverServico(s.id, -1)} disabled={i === 0} className="p-0.5 rounded text-cacau-500 hover:text-cacau-900 disabled:opacity-20 cursor-pointer" aria-label="Subir"><ChevronUp size={16} /></button>
                       <button onClick={() => moverServico(s.id, 1)} disabled={i === lista.length - 1} className="p-0.5 rounded text-cacau-500 hover:text-cacau-900 disabled:opacity-20 cursor-pointer" aria-label="Descer"><ChevronDown size={16} /></button>
                     </div>
-                    <span className="hidden sm:flex h-14 w-20 rounded-xl bg-gradient-to-b from-blush-100 to-nude-50 items-center justify-center shrink-0">
-                      <Desenho s={s} className="w-14 text-cacau-800" />
+                    <span className="hidden sm:flex h-14 w-20 rounded-xl overflow-hidden bg-gradient-to-b from-blush-100 to-nude-50 items-center justify-center shrink-0">
+                      {s.foto ? <img src={s.foto} alt="" className="h-full w-full object-cover" /> : <Desenho s={s} className="w-14 text-cacau-800" />}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -125,6 +137,18 @@ function Editor({ item, onFechar }) {
             <Campo rotulo="Duração (min)" dica={duracaoLabel(Number(f.duracao) || 0)}><input className="input" type="number" step="5" min="5" value={f.duracao} onChange={set('duracao')} /></Campo>
           </div>
           <Campo rotulo="Descrição (aparece no site)"><textarea className="input min-h-20" value={f.desc} onChange={set('desc')} /></Campo>
+          <Campo rotulo="Foto do card" dica="Sem foto, o card mostra o desenho.">
+            <div className="grid grid-cols-5 gap-2">
+              <button type="button" onClick={() => setF({ ...f, foto: null })} className={`aspect-square rounded-xl border flex items-center justify-center text-[10px] text-cacau-500 cursor-pointer ${!f.foto ? 'ring-2 ring-cacau-900 border-cacau-900' : 'border-nude-300 hover:border-cacau-500'}`}>
+                sem foto
+              </button>
+              {FOTOS.map(([src, nome]) => (
+                <button key={src} type="button" title={nome} onClick={() => setF({ ...f, foto: src })} className={`aspect-square rounded-xl overflow-hidden cursor-pointer ${f.foto === src ? 'ring-2 ring-cacau-900' : 'opacity-70 hover:opacity-100'}`}>
+                  <img src={src} alt={nome} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </Campo>
 
           {cilios && (
             <>
@@ -157,8 +181,8 @@ function Editor({ item, onFechar }) {
         <div>
           <p className="label">Prévia no site</p>
           <div className="bg-white border border-nude-200 rounded-3xl overflow-hidden">
-            <div className="h-28 bg-gradient-to-b from-blush-100 to-nude-50 flex items-center justify-center relative">
-              <Desenho s={f} className="w-28 text-cacau-800" />
+            <div className="h-28 bg-gradient-to-b from-blush-100 to-nude-50 flex items-center justify-center relative overflow-hidden">
+              {f.foto ? <img src={f.foto} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <Desenho s={f} className="w-28 text-cacau-800" />}
               {cilios && <Cores marrom={f.marrom} className="absolute bottom-2 left-2 bg-white/80 pl-2 pr-2.5 py-0.5 rounded-full" />}
             </div>
             <div className="p-4">

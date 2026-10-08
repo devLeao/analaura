@@ -10,6 +10,7 @@ import { WhatsApp } from '../../components/ui/Icones'
 import Modal from '../../components/ui/Modal'
 import { calcularStats, variacao, movimentacoes, FORMAS_PAGAMENTO } from '../../lib/stats'
 import { brl, toISO, fromISO, addDays, DIAS_CURTOS, dataCurta, dataBR, toMin, primeiroNome } from '../../lib/format'
+import { diasAbertos, horarioDaSemana } from '../../lib/schedule'
 
 const PRESETS = [
   ['7d', '7 dias'],
@@ -110,7 +111,11 @@ function Resumo({ ini, fim }) {
     : s.porDia
 
   const horas = []
-  for (let h = Math.floor(toMin(db.config.abre) / 60); h < Math.ceil(toMin(db.config.fecha) / 60); h++) horas.push(h)
+  // do horário que abre mais cedo ao que fecha mais tarde na semana
+  const abertos = diasAbertos(db.config).map((d) => horarioDaSemana(db.config, d))
+  const hIni = Math.min(...abertos.map((h) => toMin(h.abre))) / 60
+  const hFim = Math.max(...abertos.map((h) => toMin(h.fecha))) / 60
+  for (let h = Math.floor(hIni); h < Math.ceil(hFim); h++) horas.push(h)
   const CATS = [['cilios', 'Cílios', COR.serie], ['sobrancelhas', 'Sobrancelhas', '#dcc8b8'], ['remocao', 'Remoção', '#8a736b']]
   const totalCat = CATS.reduce((x, [k]) => x + (s.porCategoria[k] || 0), 0)
   const totalCilios = s.cilios.aplicacoes + s.cilios.manutencoes
@@ -195,7 +200,7 @@ function Resumo({ ini, fim }) {
         </CardGrafico>
         <CardGrafico titulo="Movimento por dia da semana" sub="Atendimentos concluídos" tabela={{ colunas: ['Dia', 'Atendimentos', 'Faturamento'], linhas: s.porDiaSemana.map((d) => [DIAS_CURTOS[d.dia], d.atendimentos, brl(d.faturamento)]) }}>
           <GraficoColunas
-            dados={s.porDiaSemana.filter((d) => db.config.diasAbertos.includes(d.dia) || d.atendimentos)}
+            dados={s.porDiaSemana.filter((d) => diasAbertos(db.config).includes(d.dia) || d.atendimentos)}
             x="dia" y="atendimentos" altura={240}
             formatarY={(v) => `${v} atendimentos`} formatarTick={(v) => v}
             tickX={(d) => DIAS_CURTOS[d]} rotuloTooltip={(d, p) => `${DIAS_CURTOS[d]} · ${brl(p.faturamento)}`}
@@ -205,7 +210,7 @@ function Resumo({ ini, fim }) {
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-4 sm:gap-6">
         <CardGrafico titulo="Horários mais procurados" sub="Atendimentos por dia da semana e hora de início">
-          <MapaCalor heat={s.heat} dias={[1, 2, 3, 4, 5, 6, 0].filter((d) => db.config.diasAbertos.includes(d))} horas={horas} nomesDias={DIAS_CURTOS} />
+          <MapaCalor heat={s.heat} dias={diasAbertos(db.config)} horas={horas} nomesDias={DIAS_CURTOS} />
         </CardGrafico>
         <section className="card p-4 sm:p-5">
           <h3 className="text-sm font-semibold text-cacau-900 mb-3">Clientes que mais gastaram</h3>

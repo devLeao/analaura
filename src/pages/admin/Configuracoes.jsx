@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { Save, RotateCcw, QrCode, ShieldCheck, Clock, Receipt, Store, Plug } from 'lucide-react'
 import { useStore } from '../../store/Store'
-import { Cabecalho, Botao, Secao, Campo } from '../../components/admin/ui'
+import { Cabecalho, Botao, Secao, Campo, Toggle } from '../../components/admin/ui'
 import Modal from '../../components/ui/Modal'
-import { DIAS_CURTOS, brl, multaDe } from '../../lib/format'
-import { gerarSlots } from '../../lib/schedule'
+import { DIAS, brl, multaDe } from '../../lib/format'
 import { CONFIG_PADRAO } from '../../data/seed'
 
 export default function Configuracoes() {
@@ -12,10 +11,9 @@ export default function Configuracoes() {
   const [f, setF] = useState({ ...db.config })
   const [confirmarReset, setConfirmarReset] = useState(false)
   const set = (k, num = false) => (e) => setF({ ...f, [k]: num ? Number(e.target.value) : e.target.value })
-  const toggleDia = (d) => setF({ ...f, diasAbertos: f.diasAbertos.includes(d) ? f.diasAbertos.filter((x) => x !== d) : [...f.diasAbertos, d].sort() })
+  const setHorario = (d, h) => setF({ ...f, horarios: { ...f.horarios, [d]: h } })
   const alterado = JSON.stringify(f) !== JSON.stringify(db.config)
   const ex = db.servicos.find((s) => s.id === 'glamour') || db.servicos[0]
-  const slots = gerarSlots(f)
 
   return (
     <>
@@ -25,24 +23,34 @@ export default function Configuracoes() {
       {alterado && <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-5">Você tem alterações não salvas.</p>}
 
       <div className="grid lg:grid-cols-2 gap-6 items-start">
-        <Secao titulo="Dias e horários" icone={Clock}>
-          <label className="label">Dias de atendimento</label>
-          <div className="flex flex-wrap gap-2 mb-5">
-            {[1, 2, 3, 4, 5, 6, 0].map((d) => (
-              <button key={d} onClick={() => toggleDia(d)} className={`h-10 w-12 rounded-full text-sm cursor-pointer transition-colors ${f.diasAbertos.includes(d) ? 'bg-cacau-900 text-nude-50 font-medium' : 'bg-nude-100 text-cacau-500 hover:bg-nude-200'}`}>
-                {DIAS_CURTOS[d]}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Campo rotulo="Abre às"><input type="time" className="input" value={f.abre} onChange={set('abre')} /></Campo>
-            <Campo rotulo="Fecha às"><input type="time" className="input" value={f.fecha} onChange={set('fecha')} /></Campo>
-            <Campo rotulo="Almoço de"><input type="time" className="input" value={f.almocoInicio} onChange={set('almocoInicio')} /></Campo>
-            <Campo rotulo="Almoço até"><input type="time" className="input" value={f.almocoFim} onChange={set('almocoFim')} /></Campo>
+        <Secao titulo="Dias e horários" icone={Clock} sub="Desligue o dia em que o estúdio não abre">
+          <ul className="divide-y divide-nude-200 -mt-1">
+            {[2, 3, 4, 5, 6, 0, 1].map((d) => {
+              const h = f.horarios?.[d]
+              return (
+                <li key={d} className="flex items-center gap-3 py-2.5">
+                  <span className="w-20 text-sm text-cacau-800">{DIAS[d]}</span>
+                  <Toggle ligado={!!h} onChange={(v) => setHorario(d, v ? ['08:00', '18:00'] : null)} />
+                  {h ? (
+                    <div className="flex items-center gap-2 ml-auto">
+                      <input type="time" className="input !w-auto !py-1.5" value={h[0]} onChange={(e) => setHorario(d, [e.target.value, h[1]])} />
+                      <span className="text-xs text-cacau-500">às</span>
+                      <input type="time" className="input !w-auto !py-1.5" value={h[1]} onChange={(e) => setHorario(d, [h[0], e.target.value])} />
+                    </div>
+                  ) : (
+                    <span className="ml-auto text-sm text-cacau-500">Fechado</span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <Campo rotulo="Pausa de (opcional)"><input type="time" className="input" value={f.almocoInicio} onChange={set('almocoInicio')} /></Campo>
+            <Campo rotulo="Pausa até"><input type="time" className="input" value={f.almocoFim} onChange={set('almocoFim')} /></Campo>
             <Campo rotulo="Intervalo entre horários (min)"><input type="number" min="10" step="5" className="input" value={f.slotMin} onChange={set('slotMin', true)} /></Campo>
             <Campo rotulo="Agenda aberta para (dias)"><input type="number" min="1" className="input" value={f.diasAgendaAberta} onChange={set('diasAgendaAberta', true)} /></Campo>
           </div>
-          <p className="text-xs text-cacau-500 mt-3">{slots.length} horários de início por dia: {slots.slice(0, 4).join(', ')}…</p>
+          <p className="text-xs text-cacau-500 mt-3">Os horários de início aparecem de {f.slotMin} em {f.slotMin} minutos. Sem pausa preenchida, a agenda corre direto.</p>
         </Secao>
 
         <Secao titulo="Cancelamento e multa" icone={Receipt}>

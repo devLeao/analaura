@@ -6,14 +6,16 @@ import { AgendamentoCard, useAcoesAgendamento } from '../../components/admin/Age
 import ModalEncaixe from '../../components/admin/ModalEncaixe'
 import Modal from '../../components/ui/Modal'
 import { brl, toISO, fromISO, addDays, DIAS_CURTOS, dataLonga, toMin, fromMin, duracaoLabel } from '../../lib/format'
-import { gerarSlots, diaAberto, intervalosOcupados, slotLivre, ocupaAgenda } from '../../lib/schedule'
+import { gerarSlots, diaAberto, intervalosOcupados, slotLivre, ocupaAgenda, horarioDo, almocoDe } from '../../lib/schedule'
 
 /** Trechos livres do expediente (já descontando almoço e horários ocupados). */
-function trechosLivres(config, ocupados) {
-  const blocos = [
-    [toMin(config.abre), toMin(config.almocoInicio)],
-    [toMin(config.almocoFim), toMin(config.fecha)],
-  ]
+function trechosLivres(config, iso, ocupados) {
+  const h = horarioDo(config, iso)
+  if (!h) return []
+  const almoco = almocoDe(config)
+  const blocos = almoco
+    ? [[toMin(h.abre), almoco[0]], [almoco[1], toMin(h.fecha)]]
+    : [[toMin(h.abre), toMin(h.fecha)]]
   const out = []
   for (let [ini, fim] of blocos) {
     const dentro = ocupados.filter(([a, b]) => a < fim && b > ini).sort((x, y) => x[0] - y[0])
@@ -49,9 +51,10 @@ export default function Agenda() {
   const linhas = useMemo(() => {
     const ags = ativos.map((a) => ({ tipo: 'ag', ag: a, ini: a.diaInteiro ? -1 : toMin(a.hora) }))
     if (diaFechado || !aberto) return ags.sort((a, b) => a.ini - b.ini)
-    const livres = trechosLivres(config, intervalosOcupados(db.agendamentos, data)).map(([a, b]) => ({ tipo: 'livre', ini: a, fim: b }))
-    const almoco = { tipo: 'almoco', ini: toMin(config.almocoInicio), fim: toMin(config.almocoFim) }
-    return [...ags, ...livres, almoco].sort((a, b) => a.ini - b.ini || (a.tipo === 'ag' ? -1 : 1))
+    const livres = trechosLivres(config, data, intervalosOcupados(db.agendamentos, data)).map(([a, b]) => ({ tipo: 'livre', ini: a, fim: b }))
+    const pausa = almocoDe(config)
+    const almoco = pausa ? [{ tipo: 'almoco', ini: pausa[0], fim: pausa[1] }] : []
+    return [...ags, ...livres, ...almoco].sort((a, b) => a.ini - b.ini || (a.tipo === 'ag' ? -1 : 1))
   }, [ativos, diaFechado, aberto, config, db.agendamentos, data])
   const minLivres = linhas.filter((l) => l.tipo === 'livre').reduce((s, l) => s + l.fim - l.ini, 0)
 
@@ -187,8 +190,8 @@ function ModalBloqueio({ data, horaInicial, onFechar }) {
   const [duracao, setDuracao] = useState(60)
   const [motivo, setMotivo] = useState('')
   const ocupados = intervalosOcupados(db.agendamentos, data)
-  const horas = gerarSlots(config).filter((h) => slotLivre(config, h, config.slotMin, ocupados, '0000-00-00'))
-  const ateFim = hora ? toMin(config.fecha) - toMin(hora) : 0
+  const horas = gerarSlots(config, data).filter((h) => slotLivre(config, data, h, config.slotMin, ocupados, true))
+  const ateFim = hora ? toMin(horarioDo(config, data).fecha) - toMin(hora) : 0
 
   return (
     <Modal aberto onFechar={onFechar} titulo="Bloquear horário" sub="Some do site, mas não mexe em quem já está marcada"

@@ -1,44 +1,42 @@
 import { Coffee, Music2, ShieldCheck, HeartHandshake } from 'lucide-react'
-import Ornamento from '../ui/Ornamento'
-import { FotoPlaceholder } from '../ui/Ilustracoes'
-import { useStore } from '../../store/Store'
 
 const MIMOS = [
-  [HeartHandshake, 'Atendimento individual, sem pressa'],
+  [HeartHandshake, 'Atendimento com calma, carinho e atenção'],
   [ShieldCheck, 'Materiais higienizados e descartáveis'],
-  [Coffee, 'Cafezinho ou chá enquanto relaxa'],
+  [Coffee, 'Um cappuccino enquanto você relaxa'],
   [Music2, 'Maca confortável e playlist calma'],
 ]
 
 export default function Sobre() {
-  const { config } = useStore().db
   return (
-    <section id="sobre" className="py-24 md:py-32 bg-nude-50 overflow-hidden">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-14 md:gap-20 items-center">
-        <div className="relative max-w-sm mx-auto w-full">
-          <div className="absolute -inset-3 arco border border-blush-300 -translate-x-4 translate-y-4" aria-hidden="true" />
-          <FotoPlaceholder legenda="Foto da Ana Laura" className="relative arco aspect-[4/5]" leque={2} />
-          <div className="absolute -bottom-6 -right-2 sm:-right-8 bg-blush-600 text-white px-6 py-4 rounded-2xl shadow-xl">
-            <div className="font-display text-3xl font-semibold italic leading-none">Lash designer</div>
-            <div className="font-label uppercase tracking-widest text-[11px] mt-1.5 text-blush-100">& designer de sobrancelhas</div>
+    <section id="sobre" className="relative bg-nude-50 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 grid lg:grid-cols-2 gap-10 lg:gap-16 items-end pt-20 lg:pt-28">
+        {/* Foto recortada da Ana na frente do nome gigante em contorno (efeito capa de revista) */}
+        <div className="relative flex justify-center">
+          <div className="absolute inset-x-0 top-6 sm:top-10 flex flex-col items-center font-display font-medium uppercase leading-[0.82] [--traco:rgba(255,255,255,0.22)] select-none pointer-events-none" aria-hidden="true">
+            <span className="contorno text-[24vw] lg:text-[11rem]">Laura</span>
+            <span className="contorno text-[24vw] lg:text-[11rem]">Célvio</span>
           </div>
+          <img src="/img/ana-recorte.webp" alt="Ana Laura, lash designer" loading="lazy" className="relative w-[85%] sm:w-[70%] lg:w-full max-w-md object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-nude-50 to-transparent" />
         </div>
-        <div>
-          <p className="font-label uppercase tracking-[0.35em] text-blush-600 text-xs mb-3">Prazer, eu sou a</p>
-          <h2 className="font-display text-5xl md:text-6xl font-semibold text-cacau-900">{config.marca}</h2>
-          <Ornamento className="mt-5 mb-8 !justify-start" />
-          <div className="space-y-4 text-cacau-600 leading-relaxed">
-            {/* Texto provisório: trocar pela história real da Ana */}
+
+        <div className="pb-20 lg:pb-28">
+          <p className="font-label uppercase tracking-[0.4em] text-blush-600 text-xs mb-4">Prazer, eu sou a</p>
+          <h2 className="font-display font-light text-6xl md:text-8xl text-cacau-900 leading-[0.95]">
+            Ana <span className="italic">Laura</span>
+          </h2>
+          <div className="h-px w-24 bg-cacau-900/30 my-8" />
+          <div className="space-y-4 text-cacau-600 leading-relaxed text-[17px]">
             <p>
-              Acredito que o cílio certo é aquele que <strong className="text-cacau-900">parece seu</strong>. Por isso cada atendimento começa
-              com uma conversa: o formato do seu olho, sua rotina e o efeito que você quer — do mais natural ao mais cheio.
+              Amo trabalhar com beleza e, principalmente, com os <strong className="text-cacau-900 font-medium">detalhes</strong> que fazem você se sentir ainda mais bonita.
             </p>
-            <p>Atendo uma cliente por vez, com hora marcada, para você chegar, deitar e sair renovada.</p>
+            <p>Cada atendimento é feito com calma, carinho e atenção, para que você se sinta bem do começo ao fim.</p>
           </div>
-          <ul className="grid sm:grid-cols-2 gap-4 mt-8">
+          <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-4 mt-10">
             {MIMOS.map(([Icone, txt]) => (
-              <li key={txt} className="flex items-center gap-3 text-sm text-cacau-800">
-                <span className="h-10 w-10 shrink-0 rounded-full bg-blush-100 flex items-center justify-center text-blush-600"><Icone size={18} /></span>
+              <li key={txt} className="flex items-center gap-3 text-sm text-cacau-700">
+                <span className="h-10 w-10 shrink-0 rounded-full border border-nude-300 flex items-center justify-center text-cacau-900"><Icone size={17} strokeWidth={1.5} /></span>
                 {txt}
               </li>
             ))}

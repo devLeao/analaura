@@ -51,9 +51,9 @@ export default function Navbar({ onLogin, onMinhaConta }) {
   )
 
   return (
-    <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${rolou || aberto ? 'bg-nude-50/95 backdrop-blur-md border-b border-nude-200 py-3' : 'bg-transparent py-5'}`}>
+    <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${rolou || aberto ? 'bg-nude-50/95 backdrop-blur-md border-b border-nude-200 py-3' : 'tema-claro bg-transparent py-5'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
-        <a href="#inicio" aria-label="Início"><Logo /></a>
+        <a href="#inicio" aria-label="Início" className={`transition-opacity duration-300 ${rolou || aberto ? "opacity-100" : "opacity-0 pointer-events-none"}`}><Logo claro={rolou || aberto} /></a>
         <nav className="hidden xl:flex items-center gap-7">
           {LINKS.map(([id, nome]) => (
             <a key={id} href={`#${id}`} className="font-label uppercase tracking-[0.2em] text-[12px] text-cacau-700 hover:text-blush-600 transition-colors">{nome}</a>
