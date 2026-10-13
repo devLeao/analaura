@@ -17,11 +17,9 @@ export default function ComoFunciona() {
 
   return (
     <section id="como-funciona" className="relative bg-[#ececec] text-neutral-900 overflow-hidden">
-      {/* Cílios postiços pretos, decorando o canto da faixa clara */}
-      <img src="/img/cilios-posticos.webp" alt="" aria-hidden="true" loading="lazy" className="hidden sm:block absolute top-16 left-[6%] lg:left-[10%] w-32 md:w-44 opacity-80 -rotate-12 pointer-events-none" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-24 md:py-32 grid lg:grid-cols-[0.9fr_1.1fr] gap-12 lg:gap-20 items-center">
         <div className="relative hidden sm:block">
-          <img src="/img/brows-lashes.webp" alt="" loading="lazy" className="w-full max-w-md mx-auto rounded-[2rem] shadow-[0_30px_60px_-20px_rgba(0,0,0,0.35)]" />
+          <img src="/img/servicos/glamour.webp" alt="Volume Glamour com design de sobrancelha" loading="lazy" className="w-full max-w-md mx-auto rounded-[2rem] shadow-[0_30px_60px_-20px_rgba(0,0,0,0.35)]" />
           <img src="/img/pincel-gel.webp" alt="" aria-hidden="true" loading="lazy" className="absolute -bottom-10 -right-6 w-48 md:w-60 animate-flutuar [--giro:-8deg] drop-shadow-[0_20px_30px_rgba(0,0,0,0.35)]" />
         </div>
 
@@ -51,7 +49,7 @@ export default function ComoFunciona() {
               <Regra>
                 Falta sem aviso gera multa de <strong className="text-white">{config.multaPct}% do valor</strong> (ex.: {ex.nome}, {brl(ex.preco)} → {brl(multaDe(ex.preco, config.multaPct))}), paga antes do próximo agendamento.
               </Regra>
-              <Regra>Atraso acima de 15 minutos pode reduzir o serviço ou exigir remarcação.</Regra>
+              <Regra>Atraso acima de 10 minutos pode reduzir o serviço ou exigir remarcação.</Regra>
             </ul>
           </div>
         </div>
