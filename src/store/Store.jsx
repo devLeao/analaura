@@ -42,6 +42,21 @@ const sincronizarOcupado = (batch, ag) => {
   else batch.delete(ref('ocupados', ag.id))
 }
 
+/**
+ * Pede ao servidor (api/avisos) os avisos de um agendamento: Telegram da Ana,
+ * Google Agenda e e-mail da cliente. Não trava a tela se falhar (ex.: rodando local).
+ */
+const avisarServidor = async (tipo, id) => {
+  try {
+    const token = await auth.currentUser?.getIdToken()
+    if (!token) return null
+    const r = await fetch('/api/avisos', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ tipo, id }) })
+    return r.ok ? await r.json() : null
+  } catch {
+    return null
+  }
+}
+
 const notificacao = (n) => ({ criadoEm: new Date().toISOString(), lida: false, ...n })
 
 export function StoreProvider({ children }) {
@@ -207,7 +222,7 @@ export function StoreProvider({ children }) {
         b.set(ref('ocupados', id), ocupadoDe(novo))
         b.set(doc(collection(fs, 'notificacoes')), notificacao({ tipo: 'agendamento', titulo: 'Novo agendamento pelo site', texto: `${ag.clienteNome} · ${ag.servicoNomes} · ${dataBR(ag.data)} às ${ag.hora}` }))
         if (ag.clienteId && ag.clienteTelefone) b.set(ref('clientes', ag.clienteId), { telefone: ag.clienteTelefone }, { merge: true })
-        gravar(b.commit())
+        gravar(b.commit()).then(() => avisarServidor('novo', id))
         return id
       },
       criarAgendamentoAdmin: (ag) => {
@@ -217,7 +232,7 @@ export function StoreProvider({ children }) {
         b.set(ref('agendamentos', id), novo)
         b.set(ref('ocupados', id), ocupadoDe(novo))
         if (ag.clienteId && ag.clienteTelefone) b.set(ref('clientes', ag.clienteId), { telefone: ag.clienteTelefone }, { merge: true })
-        return gravar(b.commit())
+        return gravar(b.commit()).then(() => { if (ag.clienteId) avisarServidor('novo', id) })
       },
       concluirAtendimento: (id, { total, forma }) => atualizarAg(id, { status: 'concluido', total, pagamento: { forma, em: toISO(new Date()) } }),
       reabrirAgendamento: (id) => atualizarAg(id, { status: 'agendado', pagamento: null }),
@@ -233,7 +248,7 @@ export function StoreProvider({ children }) {
         return atualizarAg(id, { status: 'cancelado', canceladoPor: porCliente ? 'cliente' : 'admin' }, (b) => {
           if (porCliente)
             b.set(doc(collection(fs, 'notificacoes')), notificacao({ tipo: 'cancelamento', titulo: 'Cliente cancelou o horário', texto: `${ag.clienteNome} · ${dataBR(ag.data)} às ${ag.hora}` }))
-        })
+        }).then(() => { if (ag.clienteId) avisarServidor('cancelado', id) })
       },
       /** Falta (não veio ou cancelou em cima da hora): o horário fica livre, mas gera multa. */
       marcarFalta: (id, motivo = 'nao_compareceu') => {
@@ -249,7 +264,8 @@ export function StoreProvider({ children }) {
       },
       editarAgendamento: (id, { servicoIds, data, hora }) => {
         const { nomes, total, duracao } = itensDe(listaServicos(), servicoIds)
-        return atualizarAg(id, { servicoIds, servicoNomes: nomes, total, duracao, data, hora })
+        const ag = agPorId(id)
+        return atualizarAg(id, { servicoIds, servicoNomes: nomes, total, duracao, data, hora }).then(() => { if (ag?.clienteId && ag.status === 'agendado') avisarServidor('alterado', id) })
       },
       salvarNotaAgendamento: (id, nota) => gravar(setDoc(ref('agendamentos', id), { nota }, { merge: true })),
       bloquearHorario: (data, hora, duracao, motivo) => {
@@ -346,6 +362,8 @@ export function StoreProvider({ children }) {
       salvarConfig: (config) => gravar(setDoc(ref('config', 'estudio'), limpar(config))),
       adicionarAdmin: (email) => gravar(setDoc(ref('admins', email.trim().toLowerCase()), { criadoEm: toISO(new Date()) })),
       removerAdmin: (email) => gravar(deleteDoc(ref('admins', email))),
+      /** Gera o link para a Ana ligar o Telegram dela ao bot. */
+      conectarTelegram: () => avisarServidor('conectar-telegram'),
       lerNotificacoes: () => {
         const naoLidas = estado.current.notificacoes.filter((n) => !n.lida)
         if (!naoLidas.length) return Promise.resolve()

@@ -7,6 +7,7 @@ import { useStore, pendenciasAbertasDe } from '../../store/Store'
 import { brl, dataCurta, dataLonga } from '../../lib/format'
 import { minutosAte } from '../../lib/schedule'
 import { gerarPix } from '../../lib/pix'
+import SalvarNaAgenda from './SalvarNaAgenda'
 
 // ---------------------------------------------------------------------------
 // Pagamento das pendências via Pix, todas de uma vez.
@@ -115,7 +116,8 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
           {futuros.map((a) => {
             const podeCancelar = minutosAte(a) > limite
             return (
-              <li key={a.id} className="bg-nude-50 border border-nude-200 rounded-2xl p-4 flex items-center gap-4">
+              <li key={a.id} className="bg-nude-50 border border-nude-200 rounded-2xl p-4">
+                <div className="flex items-center gap-4">
                 <div className="text-center w-12 shrink-0">
                   <div className="font-display text-3xl font-semibold text-cacau-900 leading-none">{a.data.slice(8)}</div>
                   <div className="font-label text-[11px] uppercase text-cacau-500">{dataCurta(a.data).split(' ')[1]}</div>
@@ -133,6 +135,10 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
                     Fale com<br />a Ana
                   </span>
                 )}
+                </div>
+                <div className="mt-3 pt-3 border-t border-nude-200">
+                  <SalvarNaAgenda ag={a} config={config} telegramAtivo={!!usuario.telegramChatId} compacto />
+                </div>
               </li>
             )
           })}

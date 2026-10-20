@@ -4,6 +4,7 @@ import { CalendarX2, CalendarCheck2, Clock, AlertCircle, Lock, ShieldAlert, QrCo
 import { TituloSecao } from '../ui/Ornamento'
 import { WhatsApp } from '../ui/Icones'
 import SeletorServicos, { parteDe } from '../ui/SeletorServicos'
+import SalvarNaAgenda from './SalvarNaAgenda'
 import { useStore, pendenciasAbertasDe, servicosAtivos } from '../../store/Store'
 import { brl, dataCurta, dataLonga, DIAS_CURTOS, fromISO, telefoneMask, toMin, fromMin, duracaoLabel, primeiroNome, erroTelefone } from '../../lib/format'
 import { gerarSlots, diaAberto, intervalosOcupados, slotLivre, proximosDias } from '../../lib/schedule'
@@ -72,6 +73,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
     const id = criarAgendamento({
       clienteId: usuario.id,
       clienteNome: usuario.nome,
+      clienteEmail: usuario.email,
       clienteTelefone: telefone,
       servicoIds: selecionados,
       servicoNomes: nomes,
@@ -106,7 +108,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
       </div>
     )
   } else if (confirmado) {
-    conteudo = <Confirmado ag={confirmado} config={config} onNovo={() => setConfirmadoId(null)} />
+    conteudo = <Confirmado ag={confirmado} config={config} telegramAtivo={usuario.telegramChatId} onNovo={() => setConfirmadoId(null)} />
   } else if (pendenciasAbertasDe(db, usuario.id).length > 0) {
     const pend = pendenciasAbertasDe(db, usuario.id)
     const devido = pend.reduce((s, m) => s + m.valor, 0)
@@ -291,7 +293,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
   )
 }
 
-function Confirmado({ ag, config, onNovo }) {
+function Confirmado({ ag, config, telegramAtivo, onNovo }) {
   const msg = encodeURIComponent(`Oi, Ana! Acabei de agendar pelo site:\n${ag.servicoNomes}\n${dataLonga(ag.data)} às ${ag.hora}\nNome: ${ag.clienteNome}`)
   return (
     <div className="text-center py-6 max-w-md mx-auto animate-fade-up">
@@ -305,6 +307,11 @@ function Confirmado({ ag, config, onNovo }) {
         <Linha k="Data" v={dataLonga(ag.data)} />
         <Linha k="Horário" v={`${ag.hora} às ${fromMin(toMin(ag.hora) + ag.duracao)}`} />
         <Linha k="Valor (pago no dia)" v={brl(ag.total)} forte />
+      </div>
+      <div className="mb-6">
+        <p className="text-sm text-cacau-700 mb-3">Salve na sua agenda para não esquecer:</p>
+        <SalvarNaAgenda ag={ag} config={config} telegramAtivo={!!telegramAtivo} />
+        <p className="text-xs text-cacau-500 mt-3">Também te mandamos a confirmação por e-mail e um lembrete na véspera.</p>
       </div>
       <p className="text-xs text-cacau-500 mb-6">
         Venha sem maquiagem nos olhos. Precisa desmarcar? Cancele em "Meus horários" até {config.antecedenciaCancelHoras}h antes. Faltas sem aviso geram multa de {config.multaPct}%.

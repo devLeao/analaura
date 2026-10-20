@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Save, QrCode, Clock, Receipt, Store, KeyRound, Trash2, Plus } from 'lucide-react'
+import { Save, QrCode, Clock, Receipt, Store, KeyRound, Trash2, Plus, Bell, CheckCircle2, Loader2 } from 'lucide-react'
 import { useStore } from '../../store/Store'
 import { SUPER_ADMIN } from '../../lib/firebase'
 import { Cabecalho, Botao, Secao, Campo, Toggle } from '../../components/admin/ui'
+import { Telegram } from '../../components/ui/Icones'
 import { DIAS, brl, multaDe } from '../../lib/format'
 
 export default function Configuracoes() {
-  const { db, salvarConfig, adicionarAdmin, removerAdmin, avisar } = useStore()
+  const { db, salvarConfig, adicionarAdmin, removerAdmin, conectarTelegram, avisar } = useStore()
+  const [telegram, setTelegram] = useState({ carregando: false, link: '' })
   const [f, setF] = useState({ ...db.config })
   const [novoAdmin, setNovoAdmin] = useState('')
   // Quando as configurações chegam do banco (ou mudam em outro aparelho), atualiza o formulário
@@ -87,6 +89,45 @@ export default function Configuracoes() {
             <Campo rotulo="Endereço"><input className="input" value={f.endereco} onChange={set('endereco')} /></Campo>
             <Campo rotulo="Cidade"><input className="input" value={f.cidade} onChange={set('cidade')} /></Campo>
           </div>
+        </Secao>
+
+        <Secao titulo="Avisos" icone={Bell} sub="Como você fica sabendo dos agendamentos">
+          <div className="flex items-start gap-3 mb-4">
+            <Telegram size={20} className="text-sky-600 shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm">
+              <p className="text-cacau-900 font-medium">Telegram</p>
+              {db.config.telegramAna ? (
+                <p className="text-emerald-700 flex items-center gap-1.5 mt-0.5"><CheckCircle2 size={14} /> Conectado: você recebe cada agendamento, cancelamento e a agenda do dia seguinte.</p>
+              ) : (
+                <p className="text-cacau-600 mt-0.5">Receba no celular cada agendamento e cancelamento feito pelo site, e todo fim de tarde a agenda do dia seguinte.</p>
+              )}
+              {telegram.link ? (
+                <a href={telegram.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-full bg-sky-600 text-white text-sm hover:bg-sky-700">
+                  <Telegram size={15} /> Abrir o Telegram e tocar em Iniciar
+                </a>
+              ) : (
+                <Botao
+                  className="mt-3"
+                  disabled={telegram.carregando}
+                  onClick={async () => {
+                    setTelegram({ carregando: true, link: '' })
+                    const r = await conectarTelegram()
+                    if (r?.link) setTelegram({ carregando: false, link: r.link })
+                    else {
+                      setTelegram({ carregando: false, link: '' })
+                      avisar(r?.erro || 'Não foi possível falar com o Telegram agora.', 'erro')
+                    }
+                  }}
+                >
+                  {telegram.carregando ? <Loader2 size={15} className="animate-spin" /> : <Telegram size={15} />}
+                  {db.config.telegramAna ? 'Conectar de novo' : 'Conectar meu Telegram'}
+                </Botao>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-cacau-500 border-t border-nude-200 pt-3">
+            Os agendamentos também entram sozinhos na agenda do Google <strong>lauracelvio@gmail.com</strong>, com alarme 1h antes. As clientes recebem confirmação e lembrete por e-mail (e pelo Telegram, se ativarem).
+          </p>
         </Secao>
 
         <Secao titulo="Acesso ao painel" icone={KeyRound} sub="Contas Google que podem abrir o painel">
