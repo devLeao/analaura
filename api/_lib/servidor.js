@@ -7,9 +7,8 @@
 //   GOOGLE_CALENDAR_ID        (opcional) agenda da Ana; padrão = GMAIL_USER
 import { createHash } from 'node:crypto'
 import { cert, getApps, initializeApp } from 'firebase-admin/app'
-import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
-import { JWT } from 'google-auth-library'
+import { JWT, OAuth2Client } from 'google-auth-library'
 import nodemailer from 'nodemailer'
 import { horaFim } from '../../src/lib/lembretes.js'
 
@@ -22,12 +21,31 @@ const contaServico = () => (conta ||= JSON.parse(process.env.FIREBASE_SERVICE_AC
 const app = () => getApps()[0] || initializeApp({ credential: cert(contaServico()) })
 export const db = () => getFirestore(app())
 
+// Login do site: confere o token do Firebase pelos certificados públicos do Google.
+// (o firebase-admin/auth não carrega nas funções do Vercel, por isso a conferência é feita aqui)
+const CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
+let certs = { valores: null, ate: 0 }
+async function certificados() {
+  if (certs.valores && Date.now() < certs.ate) return certs.valores
+  const r = await fetch(CERTS_URL)
+  const idade = Number(/max-age=(\d+)/.exec(r.headers.get('cache-control') || '')?.[1] || 3600)
+  certs = { valores: await r.json(), ate: Date.now() + idade * 1000 }
+  return certs.valores
+}
+async function verificarToken(token) {
+  const projeto = contaServico().project_id
+  const ticket = await new OAuth2Client().verifySignedJwtWithCertsAsync(token, await certificados(), projeto, [`https://securetoken.google.com/${projeto}`])
+  const u = ticket.getPayload()
+  if (!u?.sub) throw new Error('token sem usuário')
+  return { ...u, uid: u.sub }
+}
+
 /** Quem chamou a função (pelo login do Firebase no site) e se é administradora. */
 export async function quemChamou(req) {
   const token = (req.headers.authorization || '').replace(/^Bearer /, '')
   if (!token) return null
   try {
-    const u = await getAuth(app()).verifyIdToken(token)
+    const u = await verificarToken(token)
     const ehAdmin = !!u.email_verified && (u.email === SUPER_ADMIN || (await db().doc(`admins/${u.email}`).get()).exists)
     return { uid: u.uid, email: u.email, ehAdmin }
   } catch {
