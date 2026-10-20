@@ -1,0 +1,101 @@
+rules_version = '2';
+
+// Regras do banco do site Laura Célvio.
+// Publicar: Firebase Console → Firestore Database → Regras → colar este arquivo → Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logado() {
+      return request.auth != null;
+    }
+    function meuUid() {
+      return request.auth.uid;
+    }
+    // Administradoras: o desenvolvedor + os e-mails cadastrados em /admins (painel → Configurações)
+    function ehAdmin() {
+      return logado()
+        && request.auth.token.email_verified == true
+        && (request.auth.token.email == 'leandrofls16@gmail.com'
+            || exists(/databases/$(database)/documents/admins/$(request.auth.token.email)));
+    }
+    function agendamentoDepois(id) {
+      return getAfter(/databases/$(database)/documents/agendamentos/$(id)).data;
+    }
+
+    match /admins/{email} {
+      // cada pessoa pode conferir se o próprio e-mail é admin
+      allow read: if ehAdmin() || (logado() && request.auth.token.email == email);
+      allow write: if ehAdmin();
+    }
+
+    // Públicos: configurações e catálogo de serviços
+    match /config/{id} {
+      allow read: if true;
+      allow write: if ehAdmin();
+    }
+    match /servicos/{id} {
+      allow read: if true;
+      allow write: if ehAdmin();
+    }
+
+    // Horários ocupados, sem dados pessoais (o site usa para mostrar o que está livre)
+    match /ocupados/{id} {
+      allow read: if true;
+      allow write: if ehAdmin();
+      // A cliente cria o "ocupado" junto com o próprio agendamento...
+      allow create: if logado()
+        && agendamentoDepois(id).clienteId == meuUid()
+        && agendamentoDepois(id).status == 'agendado'
+        && request.resource.data.keys().hasOnly(['data', 'hora', 'duracao', 'status', 'diaInteiro'])
+        && request.resource.data.data == agendamentoDepois(id).data
+        && request.resource.data.hora == agendamentoDepois(id).hora
+        && request.resource.data.duracao == agendamentoDepois(id).duracao;
+      // ...e apaga quando cancela.
+      allow delete: if logado()
+        && agendamentoDepois(id).clienteId == meuUid()
+        && agendamentoDepois(id).status == 'cancelado';
+    }
+
+    match /agendamentos/{id} {
+      allow read: if ehAdmin() || (logado() && resource.data.clienteId == meuUid());
+      allow create: if ehAdmin() || (logado()
+        && request.resource.data.clienteId == meuUid()
+        && request.resource.data.status == 'agendado'
+        && request.resource.data.origem == 'site');
+      // A cliente só pode cancelar o próprio horário
+      allow update: if ehAdmin() || (logado()
+        && resource.data.clienteId == meuUid()
+        && resource.data.status == 'agendado'
+        && request.resource.data.status == 'cancelado'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'canceladoPor']));
+      allow delete: if ehAdmin();
+    }
+
+    match /clientes/{id} {
+      allow read: if ehAdmin() || (logado() && meuUid() == id);
+      allow create: if ehAdmin() || (logado() && meuUid() == id);
+      allow update: if ehAdmin() || (logado() && meuUid() == id
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'email', 'aniversario']));
+      allow delete: if ehAdmin();
+    }
+
+    // Ficha técnica e anotações: só a administradora
+    match /fichas/{id} {
+      allow read, write: if ehAdmin();
+    }
+
+    // Multas e débitos: a cliente vê as dela; só a admin (ou, depois, o servidor do Pix) altera
+    match /pendencias/{id} {
+      allow read: if ehAdmin() || (logado() && resource.data.clienteId == meuUid());
+      allow write: if ehAdmin();
+    }
+
+    // Avisos do painel: a cliente pode criar (novo agendamento / cancelamento); só a admin lê
+    match /notificacoes/{id} {
+      allow read, update, delete: if ehAdmin();
+      allow create: if ehAdmin() || (logado()
+        && request.resource.data.tipo in ['agendamento', 'cancelamento']
+        && request.resource.data.lida == false);
+    }
+  }
+}

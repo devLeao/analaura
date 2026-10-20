@@ -1,77 +1,28 @@
 import { useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Copy, Check, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, UserPlus, Crown, QrCode, CalendarX2 } from 'lucide-react'
+import { Copy, Check, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, QrCode, CalendarX2 } from 'lucide-react'
 import Modal from '../ui/Modal'
+import { WhatsApp } from '../ui/Icones'
 import { useStore, pendenciasAbertasDe } from '../../store/Store'
-import { brl, dataCurta, dataLonga, iniciais } from '../../lib/format'
+import { brl, dataCurta, dataLonga } from '../../lib/format'
 import { minutosAte } from '../../lib/schedule'
 import { gerarPix } from '../../lib/pix'
 
 // ---------------------------------------------------------------------------
-// Login: no esboço simula o seletor de contas do Google.
-// Na fase 2 vira signInWithPopup(auth, new GoogleAuthProvider()).
-// ---------------------------------------------------------------------------
-export function LoginModal({ aberto, onFechar }) {
-  const { db, entrarComoCliente, entrarComoNovoCliente, entrarComoAdmin } = useStore()
-  const [novo, setNovo] = useState(false)
-  const [nome, setNome] = useState('')
-  const [email, setEmail] = useState('')
-  const demo = db.clientes.find((c) => c.id === 'demo')
-  const devedora = db.clientes.find((c) => c.id === 'devedora')
-
-  const fechar = () => { setNovo(false); onFechar() }
-  const Conta = ({ onClick, avatar, titulo, sub, destaque }) => (
-    <button onClick={() => { onClick(); fechar() }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-nude-100 text-left cursor-pointer">
-      <span className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold ${destaque || 'bg-blush-100 text-blush-700'}`}>{avatar}</span>
-      <span className="min-w-0">
-        <span className="block text-cacau-900 text-sm font-medium truncate">{titulo}</span>
-        <span className="block text-cacau-500 text-xs truncate">{sub}</span>
-      </span>
-    </button>
-  )
-
-  return (
-    <Modal aberto={aberto} onFechar={fechar} titulo="Entrar com Google" sub="Para agendar e acompanhar seus horários">
-      <div className="mb-4 text-xs bg-blush-100/70 border border-blush-200 text-blush-700 rounded-xl px-3 py-2">
-        Esboço: o login real com Google entra na fase 2. Escolha uma conta de teste.
-      </div>
-      {!novo ? (
-        <div className="space-y-1">
-          {demo && <Conta onClick={() => entrarComoCliente(demo.id)} avatar={iniciais(demo.nome)} titulo={demo.nome} sub={`${demo.email} · tem histórico, manutenção vencendo`} />}
-          {devedora && (
-            <Conta onClick={() => entrarComoCliente(devedora.id)} avatar={iniciais(devedora.nome)} titulo={devedora.nome} sub={`${devedora.email} · tem multa por falta`} destaque="bg-amber-500/15 text-amber-300" />
-          )}
-          <Conta onClick={entrarComoAdmin} avatar={<Crown size={16} />} titulo="Ana Laura (administradora)" sub="Acesso ao painel" destaque="bg-cacau-900 text-blush-200" />
-          <button onClick={() => setNovo(true)} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-nude-100 text-left text-cacau-600 text-sm cursor-pointer">
-            <span className="h-10 w-10 rounded-full border border-dashed border-nude-400 flex items-center justify-center"><UserPlus size={16} /></span>
-            Usar outra conta
-          </button>
-        </div>
-      ) : (
-        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (nome && email) { entrarComoNovoCliente(nome, email); fechar() } }}>
-          <div><label className="label">Nome</label><input className="input" value={nome} onChange={(e) => setNome(e.target.value)} required /></div>
-          <div><label className="label">E-mail Google</label><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-          <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setNovo(false)} className="btn-ghost !py-2.5 !px-5 !text-xs">Voltar</button>
-            <button className="btn-primary !py-2.5 !px-5 !text-xs">Entrar</button>
-          </div>
-        </form>
-      )}
-    </Modal>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Pagamento das pendências via Pix, todas de uma vez
+// Pagamento das pendências via Pix, todas de uma vez.
+// Por enquanto a Ana dá a baixa no painel ao ver o Pix cair; quando o Pix
+// automático entrar, o servidor baixa sozinho e esta tela já percebe e confirma.
 // ---------------------------------------------------------------------------
 export function PagarPendenciasModal({ pendencias, onFechar }) {
-  const { db, pagarPendencias } = useStore()
+  const { db } = useStore()
   const [copiado, setCopiado] = useState(false)
-  const [pago, setPago] = useState(false)
   if (!pendencias?.length) return null
   const total = pendencias.reduce((s, m) => s + m.valor, 0)
   const { config } = db
   const codigo = gerarPix({ chave: config.pixChave, nome: config.pixNome, cidade: config.pixCidade, valor: total, txid: `PEND${pendencias[0].id}` })
+  // Pago = nenhuma das pendências continua em aberto no banco
+  const pago = pendencias.every((p) => db.pendencias.find((x) => x.id === p.id)?.status !== 'aberta')
+  const msg = encodeURIComponent(`Oi, Ana! Paguei a pendência de ${brl(total)} pelo Pix. Segue o comprovante:`)
 
   const copiar = async () => {
     try {
@@ -82,23 +33,22 @@ export function PagarPendenciasModal({ pendencias, onFechar }) {
       /* navegador sem permissão de clipboard */
     }
   }
-  const fechar = () => { setPago(false); onFechar() }
 
   return (
-    <Modal aberto onFechar={fechar} titulo={pago ? 'Pagamento confirmado' : 'Pagar multa / pendência'}>
+    <Modal aberto onFechar={onFechar} titulo={pago ? 'Pagamento confirmado' : 'Pagar multa / pendência'}>
       {pago ? (
         <div className="text-center py-4 animate-fade-up">
-          <CheckCircle2 size={56} className="text-emerald-600 mx-auto mb-4" />
+          <CheckCircle2 size={56} className="text-emerald-500 mx-auto mb-4" />
           <p className="text-cacau-900 text-lg font-semibold mb-2">Tudo certo! Agenda liberada.</p>
-          <p className="text-sm text-cacau-600 mb-6">A Ana foi avisada do pagamento. Você já pode agendar normalmente.</p>
-          <a href="#agendar" onClick={fechar} className="btn-primary">Agendar agora</a>
+          <p className="text-sm text-cacau-600 mb-6">Você já pode agendar normalmente.</p>
+          <a href="#agendar" onClick={onFechar} className="btn-primary">Agendar agora</a>
         </div>
       ) : (
         <div className="text-center">
           <ul className="text-sm text-cacau-600 mb-1 space-y-0.5">{pendencias.map((m) => <li key={m.id}>{m.descricao}</li>)}</ul>
           <p className="font-display text-5xl font-semibold text-cacau-900 mb-5">{brl(total)}</p>
           <div className="bg-white p-3 rounded-2xl border border-nude-200 w-fit mx-auto mb-4">
-            <QRCodeSVG value={codigo} size={184} level="M" fgColor="#2a201d" />
+            <QRCodeSVG value={codigo} size={184} level="M" fgColor="#111111" />
           </div>
           <p className="text-xs text-cacau-500 mb-2">Abra o app do banco → Pix → Ler QR Code, ou use o copia e cola:</p>
           <div className="flex gap-2 mb-5 min-w-0">
@@ -108,12 +58,13 @@ export function PagarPendenciasModal({ pendencias, onFechar }) {
             </button>
           </div>
           <div className="flex items-center justify-center gap-2 text-sm text-cacau-600 mb-5">
-            <Loader2 size={16} className="animate-spin text-blush-600" /> Aguardando pagamento...
+            <Loader2 size={16} className="animate-spin text-blush-600" /> Aguardando a confirmação do pagamento...
           </div>
-          <div className="border-t border-nude-200 pt-4">
-            <button onClick={() => { pagarPendencias(pendencias.map((m) => m.id), 'pix'); setPago(true) }} className="text-xs text-blush-700 hover:text-blush-600 underline underline-offset-4 cursor-pointer">
-              [Esboço] Simular pagamento confirmado
-            </button>
+          <div className="border-t border-nude-200 pt-4 space-y-3">
+            <p className="text-xs text-cacau-500">Depois de pagar, envie o comprovante para a Ana liberar sua agenda.</p>
+            <a href={`https://wa.me/${config.whatsapp}?text=${msg}`} target="_blank" rel="noreferrer" className="btn bg-white text-black hover:bg-white/85 !py-2.5 !text-[11px]">
+              <WhatsApp size={15} /> Enviar comprovante
+            </a>
           </div>
         </div>
       )}

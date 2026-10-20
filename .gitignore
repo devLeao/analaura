@@ -4,3 +4,7 @@ dist
 
 # Fotos originais em alta (o site usa as versões otimizadas em public/img)
 assets-originais/
+
+# Chave secreta do Firebase (conta de serviço): NUNCA subir pro GitHub
+service-account*.json
+*-firebase-adminsdk-*.json

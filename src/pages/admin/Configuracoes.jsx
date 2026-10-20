@@ -1,15 +1,16 @@
-import { useState } from 'react'
-import { Save, RotateCcw, QrCode, ShieldCheck, Clock, Receipt, Store, Plug } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Save, QrCode, Clock, Receipt, Store, KeyRound, Trash2, Plus } from 'lucide-react'
 import { useStore } from '../../store/Store'
+import { SUPER_ADMIN } from '../../lib/firebase'
 import { Cabecalho, Botao, Secao, Campo, Toggle } from '../../components/admin/ui'
-import Modal from '../../components/ui/Modal'
 import { DIAS, brl, multaDe } from '../../lib/format'
-import { CONFIG_PADRAO } from '../../data/seed'
 
 export default function Configuracoes() {
-  const { db, salvarConfig, resetar, avisar } = useStore()
+  const { db, salvarConfig, adicionarAdmin, removerAdmin, avisar } = useStore()
   const [f, setF] = useState({ ...db.config })
-  const [confirmarReset, setConfirmarReset] = useState(false)
+  const [novoAdmin, setNovoAdmin] = useState('')
+  // Quando as configurações chegam do banco (ou mudam em outro aparelho), atualiza o formulário
+  useEffect(() => setF({ ...db.config }), [db.config])
   const set = (k, num = false) => (e) => setF({ ...f, [k]: num ? Number(e.target.value) : e.target.value })
   const setHorario = (d, h) => setF({ ...f, horarios: { ...f.horarios, [d]: h } })
   const alterado = JSON.stringify(f) !== JSON.stringify(db.config)
@@ -88,31 +89,37 @@ export default function Configuracoes() {
           </div>
         </Secao>
 
-        <Secao titulo="Próxima fase" icone={Plug}>
-          <ul className="space-y-4 text-sm">
-            <Integracao icone={QrCode} titulo="Pix com confirmação automática" texto="Cobrança gerada pelo Mercado Pago / Asaas. Quando o banco confirma, a multa é baixada e a cliente liberada sozinha." />
-            <Integracao icone={ShieldCheck} titulo="Login com Google de verdade" texto="Autenticação real e dados salvos na nuvem, acessíveis do celular e do computador." />
+        <Secao titulo="Acesso ao painel" icone={KeyRound} sub="Contas Google que podem abrir o painel">
+          <ul className="divide-y divide-nude-200 -mt-1 mb-4">
+            {[SUPER_ADMIN, ...db.admins.filter((e) => e !== SUPER_ADMIN)].map((e) => (
+              <li key={e} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                <span className="text-cacau-800 truncate">{e}</span>
+                {e === SUPER_ADMIN ? (
+                  <span className="text-[11px] text-cacau-500">desenvolvedor</span>
+                ) : (
+                  <button onClick={() => { removerAdmin(e); avisar('Acesso removido.') }} className="p-1.5 rounded-full text-cacau-500 hover:text-red-600 hover:bg-red-50 cursor-pointer" aria-label={`Remover ${e}`}>
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </li>
+            ))}
           </ul>
-          <div className="mt-6 pt-5 border-t border-nude-200">
-            <Botao variante="fantasma" className="!text-red-600" onClick={() => setConfirmarReset(true)}><RotateCcw size={15} /> Recriar dados de exemplo</Botao>
-          </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!/^\S+@\S+\.\S+$/.test(novoAdmin)) return avisar('Informe um e-mail válido.', 'erro')
+              adicionarAdmin(novoAdmin)
+              setNovoAdmin('')
+              avisar('Acesso liberado.')
+            }}
+          >
+            <input className="input" type="email" value={novoAdmin} onChange={(e) => setNovoAdmin(e.target.value)} placeholder="email@gmail.com" />
+            <Botao variante="pri" className="shrink-0"><Plus size={15} /> Liberar</Botao>
+          </form>
+          <p className="text-xs text-cacau-500 mt-3">A pessoa entra em /admin com essa conta Google. Pagamentos de multa no Pix por enquanto são baixados manualmente em Financeiro.</p>
         </Secao>
       </div>
-
-      <Modal aberto={confirmarReset} onFechar={() => setConfirmarReset(false)} titulo="Recriar dados de exemplo?"
-        rodape={<><Botao onClick={() => setConfirmarReset(false)}>Voltar</Botao><Botao variante="perigo" onClick={() => { resetar(); setConfirmarReset(false); setF({ ...CONFIG_PADRAO }); avisar('Dados de exemplo recriados.') }}>Recriar</Botao></>}>
-        <p className="text-sm text-cacau-600">Apaga tudo o que foi feito no esboço e gera as clientes e agendamentos fictícios de novo.</p>
-      </Modal>
     </>
   )
 }
-
-const Integracao = ({ icone: Ic, titulo, texto }) => (
-  <li className="flex gap-3">
-    <span className="h-9 w-9 rounded-full bg-blush-100 text-blush-700 flex items-center justify-center shrink-0"><Ic size={16} /></span>
-    <div>
-      <div className="text-cacau-900 flex items-center gap-2">{titulo} <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-nude-100 text-cacau-500">fase 2</span></div>
-      <div className="text-cacau-500 text-xs mt-0.5">{texto}</div>
-    </div>
-  </li>
-)

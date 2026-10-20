@@ -13,7 +13,7 @@ import { brl, toISO, addDays, DIAS_CURTOS, fromISO, dataCurta, toMin, primeiroNo
 import { diaAberto, horarioDo, almocoDe } from '../../lib/schedule'
 
 export default function Inicio() {
-  const { db } = useStore()
+  const { db, usuario } = useStore()
   const { config } = db
   const [onAcao, modais] = useAcoesAgendamento()
   const [encaixe, setEncaixe] = useState(false)
@@ -57,7 +57,7 @@ export default function Inicio() {
   return (
     <>
       <Cabecalho
-        titulo={`${saudacao}, Ana`}
+        titulo={`${saudacao}, ${primeiroNome(usuario?.nome || '')}`}
         sub={diaAberto(config, hoje) ? `${doDia.length} cliente${doDia.length === 1 ? '' : 's'} hoje · ${doDia.filter((a) => a.status === 'agendado').length} ainda por atender` : 'Hoje o estúdio está fechado. Bom descanso!'}
       >
         <Botao onClick={() => setEncaixe(true)}><CalendarPlus size={16} /> Agendar cliente</Botao>

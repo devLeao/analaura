@@ -5,7 +5,7 @@ import { TituloSecao } from '../ui/Ornamento'
 import { WhatsApp } from '../ui/Icones'
 import SeletorServicos, { parteDe } from '../ui/SeletorServicos'
 import { useStore, pendenciasAbertasDe, servicosAtivos } from '../../store/Store'
-import { brl, dataCurta, dataLonga, DIAS_CURTOS, fromISO, telefoneMask, toMin, fromMin, duracaoLabel, primeiroNome } from '../../lib/format'
+import { brl, dataCurta, dataLonga, DIAS_CURTOS, fromISO, telefoneMask, toMin, fromMin, duracaoLabel, primeiroNome, erroTelefone } from '../../lib/format'
 import { gerarSlots, diaAberto, intervalosOcupados, slotLivre, proximosDias } from '../../lib/schedule'
 import { itensDe } from '../../lib/catalogo'
 
@@ -48,8 +48,8 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
 
   const dias = useMemo(() => proximosDias(config.diasAgendaAberta), [config])
   const slots = useMemo(() => (data ? gerarSlots(config, data) : []), [config, data])
-  const ocupados = useMemo(() => (data ? intervalosOcupados(db.agendamentos, data) : []), [db.agendamentos, data])
-  const diaFechado = (iso) => db.agendamentos.some((a) => a.data === iso && a.status === 'bloqueio' && a.diaInteiro)
+  const ocupados = useMemo(() => (data ? intervalosOcupados(db.ocupados, data) : []), [db.ocupados, data])
+  const diaFechado = (iso) => db.ocupados.some((a) => a.data === iso && a.status === 'bloqueio' && a.diaInteiro)
   const confirmado = confirmadoId ? db.agendamentos.find((a) => a.id === confirmadoId) : null
 
   const escolher = (vids) => {
@@ -58,10 +58,13 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
     setErro('')
   }
 
+  const erroTel = erroTelefone(telefone)
+  const telCompleto = telefone.replace(/\D/g, '').length === 11
+
   const confirmar = () => {
-    if (telefone.replace(/\D/g, '').length < 11) return setErro('Informe um WhatsApp válido.')
+    if (erroTel) return setErro(erroTel)
     // revalida o horário (outra cliente pode ter pego enquanto escolhia)
-    if (!slotLivre(config, data, hora, duracao, intervalosOcupados(db.agendamentos, data))) {
+    if (!slotLivre(config, data, hora, duracao, intervalosOcupados(db.ocupados, data))) {
       setHora(null)
       return setErro('Ops! Esse horário acabou de ser ocupado.')
     }
@@ -144,7 +147,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
                 {dias.map((iso) => {
                   const lotado =
                     diaAberto(config, iso) &&
-                    !gerarSlots(config, iso).some((h) => slotLivre(config, iso, h, duracao, intervalosOcupados(db.agendamentos, iso)))
+                    !gerarSlots(config, iso).some((h) => slotLivre(config, iso, h, duracao, intervalosOcupados(db.ocupados, iso)))
                   const fechado = !diaAberto(config, iso) || diaFechado(iso) || lotado
                   const d = fromISO(iso)
                   const on = data === iso
@@ -256,7 +259,16 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
           {hora && (
             <div className="mt-5 animate-fade-up">
               <label className="label">Seu WhatsApp</label>
-              <input className="input" type="tel" value={telefone} onChange={(e) => setTelefone(telefoneMask(e.target.value))} placeholder="(31) 99999-9999" />
+              <input
+                className={`input ${telCompleto && erroTel ? '!border-red-500' : ''}`}
+                type="tel"
+                inputMode="numeric"
+                value={telefone}
+                onChange={(e) => { setTelefone(telefoneMask(e.target.value)); setErro('') }}
+                placeholder="(31) 99999-9999"
+              />
+              {/* Avisa assim que o número fica completo, antes de clicar em Confirmar */}
+              {telCompleto && erroTel && <p className="text-xs text-red-400 mt-1.5">{erroTel}</p>}
             </div>
           )}
           {erro && <p className="flex items-center gap-2 text-sm text-red-400 mt-3"><AlertCircle size={15} className="shrink-0" /> {erro}</p>}

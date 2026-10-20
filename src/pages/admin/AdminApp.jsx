@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Route, Routes, Link, Navigate, useLocation } from 'react-router-dom'
 import {
   Home, CalendarDays, Users, Wallet, Sparkles, Settings, Bell, ExternalLink, LogOut, MoreHorizontal, X, Crown,
-  CheckCircle2, CalendarPlus, CalendarX, Info,
+  CheckCircle2, CalendarPlus, CalendarX, Info, Loader2,
 } from 'lucide-react'
 import Logo from '../../components/ui/Logo'
 import { GoogleG } from '../../components/site/Agendamento'
@@ -25,11 +25,18 @@ const MENU = [
 const MOBILE_PRINCIPAL = ['', 'agenda', 'clientes', 'financeiro']
 
 export default function AdminApp() {
-  const { usuario, entrarComoAdmin, db } = useStore()
+  const { usuario, authPronto, entrar, sair, db } = useStore()
   const { pathname } = useLocation()
   useEffect(() => {
     window.scrollTo(0, 0) // cada página abre do topo
   }, [pathname])
+
+  if (!authPronto)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-nude-50">
+        <Loader2 className="animate-spin text-cacau-500" size={28} />
+      </div>
+    )
 
   if (usuario?.tipo !== 'admin') {
     return (
@@ -37,11 +44,23 @@ export default function AdminApp() {
         <div className="card p-8 max-w-sm w-full text-center shadow-xl shadow-blush-700/5 !rounded-3xl">
           <Logo className="justify-center mb-6" />
           <h1 className="font-display text-3xl font-semibold text-cacau-900 mb-1">Seu painel</h1>
-          <p className="text-sm text-cacau-500 mb-6">Acesso restrito à administradora.</p>
-          <button onClick={entrarComoAdmin} className="w-full flex items-center justify-center gap-3 bg-white border border-nude-300 text-cacau-900 font-medium py-3 rounded-full hover:border-blush-400 cursor-pointer">
-            <GoogleG /> Entrar com Google
-          </button>
-          <p className="text-xs text-cacau-500 mt-4">Esboço: entra direto como administradora.</p>
+          {usuario ? (
+            <>
+              <p className="text-sm text-cacau-600 mb-6">
+                A conta <strong className="text-cacau-900">{usuario.email}</strong> não tem acesso ao painel.
+              </p>
+              <button onClick={sair} className="w-full flex items-center justify-center gap-2 border border-nude-300 text-cacau-900 font-medium py-3 rounded-full hover:border-blush-400 cursor-pointer">
+                <LogOut size={16} /> Entrar com outra conta
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-cacau-500 mb-6">Acesso restrito à administradora.</p>
+              <button onClick={entrar} className="w-full flex items-center justify-center gap-3 bg-white border border-nude-300 text-cacau-900 font-medium py-3 rounded-full hover:border-blush-400 cursor-pointer">
+                <GoogleG /> Entrar com Google
+              </button>
+            </>
+          )}
           <Link to="/" className="text-xs text-blush-700 hover:underline mt-6 inline-block">← Voltar ao site</Link>
         </div>
       </div>
@@ -114,7 +133,7 @@ const ICONE_NOTIF = {
 }
 
 function Topo() {
-  const { db, sair, lerNotificacoes } = useStore()
+  const { db, usuario, sair, lerNotificacoes } = useStore()
   const [aberto, setAberto] = useState(false)
   const ref = useRef(null)
   const naoLidas = db.notificacoes.filter((n) => !n.lida).length
@@ -166,8 +185,8 @@ function Topo() {
           )}
         </div>
         <div className="hidden sm:flex items-center gap-2 pl-3 ml-1 border-l border-nude-200">
-          <span className="h-9 w-9 rounded-full bg-cacau-900 text-blush-200 flex items-center justify-center"><Crown size={15} /></span>
-          <span className="text-sm text-cacau-800">Ana Laura</span>
+          {usuario?.foto ? <img src={usuario.foto} alt="" referrerPolicy="no-referrer" className="h-9 w-9 rounded-full object-cover" /> : <span className="h-9 w-9 rounded-full bg-cacau-900 text-blush-200 flex items-center justify-center"><Crown size={15} /></span>}
+          <span className="text-sm text-cacau-800">{usuario?.nome?.split(' ')[0]}</span>
         </div>
         <button onClick={sair} className="p-2.5 rounded-full text-cacau-500 hover:bg-white hover:text-cacau-900 cursor-pointer" title="Sair"><LogOut size={18} /></button>
       </div>

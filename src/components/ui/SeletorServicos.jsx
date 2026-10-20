@@ -11,7 +11,8 @@ export const parteDe = (servicos, vid) => (resolver(servicos, vid)?.categoria ==
  *  - Cílios: primeiro o tipo (Aplicação / Manutenção / Remoção), depois o modelo
  *  - Sobrancelhas: uma opção
  * Ao escolher, a parte fecha e mostra só o que foi escolhido (com Trocar / remover).
- * A cor (preto/marrom) não entra aqui: é combinada na hora do atendimento.
+ * Depois de escolher um modelo que também é feito em marrom, aparece a escolha da cor,
+ * para a Ana saber com antecedência se precisa ter fios marrons.
  * `sel` é a lista de ids de variação (ver lib/catalogo.js).
  */
 export default function SeletorServicos({ servicos, sel, onChange, compacto = false }) {
@@ -38,18 +39,25 @@ export default function SeletorServicos({ servicos, sel, onChange, compacto = fa
               ? { vid: montarVid(s.id, { manutencao: true }), nome: s.nome, preco: s.manutencao.preco, obs: `até ${prazoLabel(s.manutencao)}`, cores: TEMAS_CILIOS[s.id] || TEMA_NEUTRO }
               : { vid: s.id, nome: s.nome, preco: s.preco, cores: TEMAS_CILIOS[s.id] || TEMA_NEUTRO }
           )
+  const ciliosEscolhido = ciliosVid ? resolver(servicos, ciliosVid) : null
   const opcoesSob = servicos.filter((s) => s.categoria === 'sobrancelhas').map((s) => ({ vid: s.id, nome: s.nome, preco: s.preco }))
 
   return (
     <div className={compacto ? 'space-y-3' : 'space-y-4'}>
       <Parte
         titulo="Cílios"
-        escolhido={ciliosVid && resolver(servicos, ciliosVid)}
+        escolhido={ciliosEscolhido}
         aberta={!ciliosVid || trocando.cilios}
         onTrocar={() => setTrocando((t) => ({ ...t, cilios: true }))}
         onManter={() => setTrocando((t) => ({ ...t, cilios: false }))}
         onRemover={() => definir('cilios', ciliosVid, null)}
         compacto={compacto}
+        extra={ciliosEscolhido?.base.marrom && (
+          <EscolhaCor
+            marrom={ciliosEscolhido.marrom}
+            onChange={(marrom) => definir('cilios', ciliosVid, montarVid(ciliosEscolhido.base.id, { manutencao: ciliosEscolhido.manutencao, marrom }))}
+          />
+        )}
       >
         <div className="inline-flex bg-nude-100 rounded-full p-1 gap-1 mb-3">
           {[['aplicacao', 'Aplicação'], ['manutencao', 'Manutenção'], ['remocao', 'Remoção']].map(([id, nome]) => (
@@ -82,9 +90,9 @@ export default function SeletorServicos({ servicos, sel, onChange, compacto = fa
 }
 
 /** Um bloco (Cílios ou Sobrancelhas): aberto mostra as opções; com algo escolhido, mostra só o escolhido. */
-function Parte({ titulo, escolhido, aberta, onTrocar, onManter, onRemover, compacto, children }) {
+function Parte({ titulo, escolhido, aberta, onTrocar, onManter, onRemover, compacto, extra, children }) {
   return (
-    <section className={`rounded-3xl border ${escolhido && !aberta ? 'border-blush-300 bg-blush-100/40' : 'border-nude-200 bg-white/60'} ${compacto ? 'p-3' : 'p-4 sm:p-5'}`}>
+    <section className={`rounded-3xl border ${escolhido && !aberta ? 'border-blush-300 bg-blush-100/40' : 'border-nude-200 bg-superficie/60'} ${compacto ? 'p-3' : 'p-4 sm:p-5'}`}>
       <div className="flex items-center justify-between gap-3">
         <h4 className={`font-medium text-cacau-900 ${compacto ? 'text-sm' : ''}`}>{titulo}</h4>
         {!escolhido && <span className="text-xs text-cacau-500">opcional</span>}
@@ -94,15 +102,18 @@ function Parte({ titulo, escolhido, aberta, onTrocar, onManter, onRemover, compa
       </div>
 
       {escolhido && !aberta ? (
-        <div className="flex items-center gap-3 mt-3 animate-fade-up">
-          <span className="h-6 w-6 shrink-0 rounded-full bg-cacau-900 text-nude-50 flex items-center justify-center"><Check size={13} strokeWidth={3} /></span>
-          <span className="flex-1 min-w-0 text-sm text-cacau-900">{escolhido.nome}</span>
-          <span className="text-sm text-cacau-700 tabular-nums whitespace-nowrap">{brl(escolhido.preco)}</span>
-          <button type="button" onClick={onTrocar} className="text-xs text-blush-700 hover:underline underline-offset-4 cursor-pointer px-1">Trocar</button>
-          <button type="button" onClick={onRemover} className="p-1.5 rounded-full text-cacau-500 hover:text-red-600 hover:bg-red-50 cursor-pointer" aria-label={`Remover ${titulo.toLowerCase()}`}>
-            <X size={15} />
-          </button>
-        </div>
+        <>
+          <div className="flex items-center gap-3 mt-3 animate-fade-up">
+            <span className="h-6 w-6 shrink-0 rounded-full bg-cacau-900 text-nude-50 flex items-center justify-center"><Check size={13} strokeWidth={3} /></span>
+            <span className="flex-1 min-w-0 text-sm text-cacau-900">{escolhido.nome}</span>
+            <span className="text-sm text-cacau-700 tabular-nums whitespace-nowrap">{brl(escolhido.preco)}</span>
+            <button type="button" onClick={onTrocar} className="text-xs text-blush-700 hover:underline underline-offset-4 cursor-pointer px-1">Trocar</button>
+            <button type="button" onClick={onRemover} className="p-1.5 rounded-full text-cacau-500 hover:text-red-600 hover:bg-red-50 cursor-pointer" aria-label={`Remover ${titulo.toLowerCase()}`}>
+              <X size={15} />
+            </button>
+          </div>
+          {extra}
+        </>
       ) : (
         <div className="mt-3">{children}</div>
       )}
@@ -139,6 +150,28 @@ function Lista({ opcoes, atual, onEscolher, compacto }) {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+/** Cor dos fios (só para modelos que também são feitos em marrom). */
+function EscolhaCor({ marrom, onChange }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 mt-3 pl-9">
+      <span className="text-xs text-cacau-500">Cor dos fios:</span>
+      <div className="inline-flex bg-nude-100 rounded-full p-1 gap-1">
+        {[[false, 'Preto', 'bg-black'], [true, 'Marrom', 'bg-[#6b4226]']].map(([valor, nome, cor]) => (
+          <button
+            key={nome}
+            type="button"
+            onClick={() => onChange(valor)}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm cursor-pointer transition-colors ${marrom === valor ? 'bg-superficie text-cacau-900 shadow-sm font-medium' : 'text-cacau-600 hover:text-cacau-900'}`}
+          >
+            <span className={`h-2.5 w-2.5 rounded-full ring-1 ring-white/60 ${cor}`} />
+            {nome}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
