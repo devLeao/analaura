@@ -47,6 +47,8 @@ service cloud.firestore {
         && agendamentoDepois(id).clienteId == meuUid()
         && agendamentoDepois(id).status == 'agendado'
         && request.resource.data.keys().hasOnly(['data', 'hora', 'duracao', 'status', 'diaInteiro'])
+        && request.resource.data.status == 'agendado'
+        && request.resource.data.diaInteiro == false
         && request.resource.data.data == agendamentoDepois(id).data
         && request.resource.data.hora == agendamentoDepois(id).hora
         && request.resource.data.duracao == agendamentoDepois(id).duracao;
@@ -58,10 +60,16 @@ service cloud.firestore {
 
     match /agendamentos/{id} {
       allow read: if ehAdmin() || (logado() && resource.data.clienteId == meuUid());
+      // Só os campos de um agendamento comum (nada de campos internos como eventoId ou avisos)
       allow create: if ehAdmin() || (logado()
+        && request.resource.data.keys().hasOnly(['criadoEm', 'status', 'origem', 'pagamento', 'nota', 'clienteId', 'clienteNome', 'clienteEmail',
+             'clienteTelefone', 'servicoIds', 'servicoNomes', 'total', 'duracao', 'data', 'hora'])
         && request.resource.data.clienteId == meuUid()
         && request.resource.data.status == 'agendado'
-        && request.resource.data.origem == 'site');
+        && request.resource.data.origem == 'site'
+        && request.resource.data.pagamento == null
+        && request.resource.data.duracao is int && request.resource.data.duracao > 0 && request.resource.data.duracao <= 600
+        && request.resource.data.servicoIds is list && request.resource.data.servicoIds.size() <= 3);
       // A cliente só pode cancelar o próprio horário
       allow update: if ehAdmin() || (logado()
         && resource.data.clienteId == meuUid()
@@ -73,10 +81,16 @@ service cloud.firestore {
 
     match /clientes/{id} {
       allow read: if ehAdmin() || (logado() && meuUid() == id);
-      allow create: if ehAdmin() || (logado() && meuUid() == id);
+      allow create: if ehAdmin() || (logado() && meuUid() == id
+        && request.resource.data.keys().hasOnly(['nome', 'email', 'telefone', 'aniversario', 'criadoEm']));
       allow update: if ehAdmin() || (logado() && meuUid() == id
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'email', 'aniversario']));
       allow delete: if ehAdmin();
+    }
+
+    // Dados internos do servidor (Telegram da Ana): ninguém lê pelo site
+    match /privado/{id} {
+      allow read, write: if false;
     }
 
     // Ficha técnica e anotações: só a administradora
@@ -94,8 +108,10 @@ service cloud.firestore {
     match /notificacoes/{id} {
       allow read, update, delete: if ehAdmin();
       allow create: if ehAdmin() || (logado()
+        && request.resource.data.keys().hasOnly(['criadoEm', 'lida', 'tipo', 'titulo', 'texto'])
         && request.resource.data.tipo in ['agendamento', 'cancelamento']
-        && request.resource.data.lida == false);
+        && request.resource.data.lida == false
+        && request.resource.data.texto is string && request.resource.data.texto.size() <= 300);
     }
   }
 }
