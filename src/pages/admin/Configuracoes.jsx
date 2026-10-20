@@ -7,7 +7,8 @@ import { Telegram } from '../../components/ui/Icones'
 import { DIAS, brl, multaDe } from '../../lib/format'
 
 export default function Configuracoes() {
-  const { db, salvarConfig, adicionarAdmin, removerAdmin, conectarTelegram, avisar } = useStore()
+  const { db, salvarConfig, adicionarAdmin, removerAdmin, conectarTelegram, testarAvisos, avisar } = useStore()
+  const [teste, setTeste] = useState({ carregando: false, r: null })
   const [telegram, setTelegram] = useState({ carregando: false, link: '' })
   const [f, setF] = useState({ ...db.config })
   const [novoAdmin, setNovoAdmin] = useState('')
@@ -125,7 +126,32 @@ export default function Configuracoes() {
               )}
             </div>
           </div>
-          <p className="text-xs text-cacau-500 border-t border-nude-200 pt-3">
+          <div className="border-t border-nude-200 pt-3 mb-3">
+            <Botao
+              disabled={teste.carregando}
+              onClick={async () => {
+                setTeste({ carregando: true, r: null })
+                const r = await testarAvisos()
+                setTeste({ carregando: false, r: r || { erro: 'O servidor não respondeu.' } })
+              }}
+            >
+              {teste.carregando ? <Loader2 size={15} className="animate-spin" /> : <Bell size={15} />} Enviar teste
+            </Botao>
+            {teste.r && (
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {teste.r.erro ? (
+                  <li className="text-red-700">{teste.r.erro}</li>
+                ) : (
+                  [['telegram', 'Telegram'], ['agenda', 'Google Agenda'], ['email', 'E-mail (para você)']].map(([k, nome]) => (
+                    <li key={k} className={teste.r[k] === 'ok' ? 'text-emerald-700' : 'text-red-700'}>
+                      <strong>{nome}:</strong> {teste.r[k] === 'ok' ? 'funcionando ✓' : teste.r[k]}
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+          </div>
+          <p className="text-xs text-cacau-500">
             Os agendamentos também entram sozinhos na agenda do Google <strong>lauracelvio@gmail.com</strong>, com alarme 1h antes. As clientes recebem confirmação e lembrete por e-mail (e pelo Telegram, se ativarem).
           </p>
         </Secao>

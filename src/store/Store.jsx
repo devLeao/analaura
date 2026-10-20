@@ -51,7 +51,7 @@ const avisarServidor = async (tipo, id) => {
     const token = await auth.currentUser?.getIdToken()
     if (!token) return null
     const r = await fetch('/api/avisos', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ tipo, id }) })
-    return r.ok ? await r.json() : null
+    return r.ok ? await r.json() : { erro: `O servidor respondeu com erro ${r.status}.` }
   } catch {
     return null
   }
@@ -364,6 +364,7 @@ export function StoreProvider({ children }) {
       removerAdmin: (email) => gravar(deleteDoc(ref('admins', email))),
       /** Gera o link para a Ana ligar o Telegram dela ao bot. */
       conectarTelegram: () => avisarServidor('conectar-telegram'),
+      testarAvisos: () => avisarServidor('teste'),
       lerNotificacoes: () => {
         const naoLidas = estado.current.notificacoes.filter((n) => !n.lida)
         if (!naoLidas.length) return Promise.resolve()

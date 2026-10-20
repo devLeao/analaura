@@ -22,6 +22,10 @@ export default async function handler(req, res) {
     if (!quem.ehAdmin) return res.status(403).end()
     return res.json(await conectarTelegram(req))
   }
+  if (tipo === 'teste') {
+    if (!quem.ehAdmin) return res.status(403).end()
+    return res.json(await testar(quem))
+  }
 
   const ref = db().doc(`agendamentos/${id}`)
   const ag = await lerDoc(`agendamentos/${id}`)
@@ -56,6 +60,12 @@ export default async function handler(req, res) {
     if (!(await marcar('novo'))) return res.json({ ok: true })
     await todas([
       criarEvento(ag, cliente).then((eventoId) => eventoId && ref.update({ eventoId })),
+      telegram(cliente?.telegramChatId, `✅ <b>Horário confirmado!</b>
+
+${dataLonga(ag.data)}, ${ag.hora} às ${horaFim(ag)}
+${esc(ag.servicoNomes)}
+
+Vou te lembrar na véspera.`),
       ag.origem === 'site' &&
         telegram(anaChat, `📅 <b>Novo agendamento</b>\n\n<b>${esc(ag.clienteNome)}</b>\n${esc(ag.servicoNomes)}\n${dataLonga(ag.data)} · ${ag.hora} às ${horaFim(ag)}\n${brl(ag.total)}${whatsCliente}`),
       email(
@@ -110,6 +120,37 @@ export default async function handler(req, res) {
     ])
   }
   res.json({ ok: true })
+}
+
+/** Botão "Enviar teste" do painel: testa cada aviso e devolve o erro exato de cada um. */
+async function testar(quem) {
+  const tentar = async (f) => {
+    try {
+      await f()
+      return 'ok'
+    } catch (e) {
+      return String(e?.message || e).slice(0, 400)
+    }
+  }
+  const privado = await lerDoc('privado/telegram')
+  const amanha = new Date(Date.now() + 21 * 3600e3).toISOString().slice(0, 10)
+  const falso = { data: amanha, hora: '12:00', duracao: 30, clienteNome: 'Teste do site', servicoNomes: 'Pode apagar', total: 0, origem: 'site' }
+  return {
+    telegram: await tentar(async () => {
+      if (!process.env.TELEGRAM_BOT_TOKEN) throw new Error('TELEGRAM_BOT_TOKEN não configurado no Vercel')
+      if (!privado?.anaChatId) throw new Error('Telegram ainda não conectado (botão Conectar meu Telegram)')
+      await telegram(privado.anaChatId, '✅ Teste do site: os avisos do Telegram estão funcionando.')
+    }),
+    agenda: await tentar(async () => {
+      const id = await criarEvento(falso)
+      if (!id) throw new Error('A agenda não devolveu o evento')
+      await apagarEvento(id)
+    }),
+    email: await tentar(async () => {
+      if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) throw new Error('GMAIL_USER ou GMAIL_APP_PASSWORD não configurado no Vercel')
+      await email(quem.email, 'Teste de e-mail do site', modeloEmail({ titulo: 'Teste de e-mail', texto: 'Se você está lendo isto, os e-mails do site estão funcionando.' }))
+    }),
+  }
 }
 
 /** Registra o endereço do bot e gera o link de uso único para a Ana ligar o Telegram dela. */
