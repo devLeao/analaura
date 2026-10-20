@@ -131,9 +131,16 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
                     <CalendarX2 size={18} />
                   </button>
                 ) : (
-                  <span className="text-[10px] font-label uppercase tracking-wider text-amber-700 text-right leading-tight" title={`Menos de ${config.antecedenciaCancelHoras}h para o horário. Fale com a Ana pelo WhatsApp.`}>
+                  <a
+                    href={`https://wa.me/${config.whatsapp}?text=${encodeURIComponent(`Oi, Ana! Preciso falar sobre o meu horário de ${dataLonga(a.data)} às ${a.hora} (${a.servicoNomes}).`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex flex-col items-center gap-0.5 text-[10px] font-label uppercase tracking-wider text-amber-700 hover:text-amber-600 text-center leading-tight"
+                    title={`Menos de ${config.antecedenciaCancelHoras}h para o horário: para desmarcar, fale com a Ana.`}
+                  >
+                    <WhatsApp size={16} />
                     Fale com<br />a Ana
-                  </span>
+                  </a>
                 )}
                 </div>
                 <div className="mt-3 pt-3 border-t border-nude-200">
@@ -166,7 +173,7 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
       )}
 
       <p className="flex items-start gap-2 text-[11px] text-cacau-500 mt-6">
-        <ShieldCheck size={14} className="shrink-0 mt-px" /> Cancelamento grátis até {config.antecedenciaCancelHoras}h antes. Faltas sem aviso geram multa de {config.multaPct}%.
+        <ShieldCheck size={14} className="shrink-0 mt-px" /> Cancelamento grátis aqui até {config.antecedenciaCancelHoras}h antes; depois disso, fale com a Ana pelo WhatsApp. Faltas sem aviso geram multa de {config.multaPct}%.
       </p>
 
       <Modal
