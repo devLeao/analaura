@@ -47,6 +47,7 @@ export function Kpi({ icone: Icone, rotulo, valor, detalhe, tom = 'neutro' }) {
 }
 
 export const STATUS = {
+  aguardando: { txt: 'Esperando sinal', icone: Clock3, cls: 'text-amber-800 bg-amber-50 border-amber-200', barra: 'bg-amber-400' },
   agendado: { txt: 'Agendado', icone: CalendarCheck, cls: 'text-violet-800 bg-violet-50 border-violet-200', barra: 'bg-violet-400' },
   concluido: { txt: 'Concluído', icone: CheckCircle2, cls: 'text-emerald-800 bg-emerald-50 border-emerald-200', barra: 'bg-emerald-400' },
   cancelado: { txt: 'Cancelado', icone: Ban, cls: 'text-cacau-600 bg-nude-100 border-nude-300', barra: 'bg-nude-300' },

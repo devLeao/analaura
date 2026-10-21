@@ -143,7 +143,7 @@ export default function Servicos({ onEscolher }) {
           </div>
         )}
 
-        <p className="text-center text-xs text-cacau-500 mt-10">Dá para combinar cílios e sobrancelha no mesmo horário. O pagamento é feito no dia do atendimento.</p>
+        <p className="text-center text-xs text-cacau-500 mt-10">Dá para combinar cílios e sobrancelha no mesmo horário.</p>
       </div>
     </section>
   )

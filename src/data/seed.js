@@ -35,7 +35,13 @@ export const CONFIG_PADRAO = {
 
   // Igual ao Arian: sem sinal. Cancelamento grátis até X horas antes; falta gera multa.
   antecedenciaCancelHoras: 24,
-  multaPct: 50,
+  multaPct: 50, // falta sem sinal pago
+  // Sinal no Pix (Mercado Pago) para confirmar o horário
+  sinalAtivo: true,
+  sinalPct: 30,
+  multaComSinalPct: 20, // falta com sinal pago: a Ana fica com o sinal + esta multa
+  prazoSinalMin: 15, // tempo para pagar antes do horário voltar a ficar livre
+  devolverSinalTardio: true, // cancelou com menos de 24h: devolve o sinal mesmo assim
 
   // Pix para a cliente pagar multas/pendências pelo site
   pixChave: '60294908000187', // CNPJ

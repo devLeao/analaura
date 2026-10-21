@@ -5,6 +5,8 @@ import { TituloSecao } from '../ui/Ornamento'
 import { WhatsApp } from '../ui/Icones'
 import SeletorServicos, { parteDe } from '../ui/SeletorServicos'
 import SalvarNaAgenda from './SalvarNaAgenda'
+import { AguardandoSinal } from './PagarPix'
+import { sinalLigado, valorSinal, restanteNoDia, sinalPago } from '../../lib/sinal'
 import { useStore, pendenciasAbertasDe, servicosAtivos } from '../../store/Store'
 import { brl, dataCurta, dataLonga, DIAS_CURTOS, fromISO, telefoneMask, toMin, fromMin, duracaoLabel, primeiroNome, erroTelefone } from '../../lib/format'
 import { gerarSlots, diaAberto, intervalosOcupados, slotLivre, proximosDias } from '../../lib/schedule'
@@ -32,6 +34,14 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
   const [telefone, setTelefone] = useState('')
   const [erro, setErro] = useState('')
   const [confirmadoId, setConfirmadoId] = useState(null)
+  const [enviando, setEnviando] = useState(false)
+  const [expirou, setExpirou] = useState(false)
+  const comSinal = sinalLigado(config)
+  // Desistiu (ou a Ana cancelou) enquanto esperava o Pix: volta para a escolha de horário
+  const statusConfirmado = db.agendamentos.find((a) => a.id === confirmadoId)?.status
+  useEffect(() => {
+    if (statusConfirmado === 'cancelado') setConfirmadoId(null)
+  }, [statusConfirmado])
 
   useEffect(() => {
     if (servicoInicial) {
@@ -62,7 +72,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
   const erroTel = erroTelefone(telefone)
   const telCompleto = telefone.replace(/\D/g, '').length === 11
 
-  const confirmar = () => {
+  const confirmar = async () => {
     if (erroTel) return setErro(erroTel)
     // revalida o horário (outra cliente pode ter pego enquanto escolhia)
     if (!slotLivre(config, data, hora, duracao, intervalosOcupados(db.ocupados, data))) {
@@ -70,7 +80,8 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
       return setErro('Ops! Esse horário acabou de ser ocupado.')
     }
     setErro('')
-    const id = criarAgendamento({
+    setEnviando(true)
+    const id = await criarAgendamento({
       clienteId: usuario.id,
       clienteNome: usuario.nome,
       clienteEmail: usuario.email,
@@ -82,6 +93,9 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
       data,
       hora,
     })
+    setEnviando(false)
+    if (!id) return
+    setExpirou(false)
     setConfirmadoId(id)
     setSelecionados([])
     setData(null)
@@ -107,6 +121,19 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
         <Link to="/admin/agenda" className="text-blush-700 underline underline-offset-4">agenda do painel</Link>.
       </div>
     )
+  } else if (confirmadoId && (expirou || !confirmado)) {
+    conteudo = (
+      <div className="max-w-md mx-auto text-center py-12 bg-superficie border border-nude-200 rounded-3xl px-6 animate-fade-up">
+        <Clock className="mx-auto text-amber-500 mb-4" size={36} />
+        <h3 className="font-display text-3xl text-cacau-900 font-semibold mb-2">O tempo acabou</h3>
+        <p className="text-sm text-cacau-600 mb-6">O sinal não foi pago a tempo e o horário voltou a ficar livre. Se você pagou agora há pouco, não se preocupe: se o horário ainda estiver livre ele é confirmado, senão o Pix volta sozinho para a sua conta.</p>
+        <button onClick={() => { setConfirmadoId(null); setExpirou(false) }} className="btn-primary">Escolher horário</button>
+      </div>
+    )
+  } else if (confirmado?.status === 'aguardando') {
+    conteudo = <AguardandoSinal ag={confirmado} onDesistir={() => setConfirmadoId(null)} onExpirou={() => setExpirou(true)} />
+  } else if (confirmado?.status === 'cancelado') {
+    conteudo = null
   } else if (confirmado) {
     conteudo = <Confirmado ag={confirmado} config={config} telegramAtivo={usuario.telegramChatId} onNovo={() => setConfirmadoId(null)} />
   } else if (pendenciasAbertasDe(db, usuario.id).length > 0) {
@@ -252,9 +279,15 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
                 {data ? `${dataCurta(data)}${hora ? `, ${hora} às ${fromMin(toMin(hora) + duracao)}` : ' · escolha o horário'}` : `${duracaoLabel(duracao)} · escolha o dia`}
               </div>
               <div className="flex justify-between items-baseline border-t border-dashed border-nude-300 mt-4 pt-4">
-                <span className="text-sm text-cacau-600">Total no dia</span>
+                <span className="text-sm text-cacau-600">{comSinal ? 'Total' : 'Total no dia'}</span>
                 <span className="font-display text-3xl font-semibold text-cacau-900">{brl(total)}</span>
               </div>
+              {comSinal && (
+                <div className="mt-2 space-y-1 text-sm">
+                  <div className="flex justify-between"><span className="text-cacau-600">Sinal agora no Pix ({config.sinalPct}%)</span><span className="text-cacau-900 font-medium tabular-nums">{brl(valorSinal(total, config))}</span></div>
+                  <div className="flex justify-between"><span className="text-cacau-500">Restante no dia</span><span className="text-cacau-600 tabular-nums">{brl(total - valorSinal(total, config))}</span></div>
+                </div>
+              )}
             </>
           )}
 
@@ -274,9 +307,13 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
             </div>
           )}
           {erro && <p className="flex items-center gap-2 text-sm text-red-400 mt-3"><AlertCircle size={15} className="shrink-0" /> {erro}</p>}
-          <button onClick={confirmar} disabled={!itens.length || !data || !hora} className="btn-primary w-full mt-5">Confirmar</button>
+          <button onClick={confirmar} disabled={!itens.length || !data || !hora || enviando} className="btn-primary w-full mt-5">
+            {enviando ? 'Reservando...' : comSinal ? 'Confirmar e pagar sinal' : 'Confirmar'}
+          </button>
           <p className="text-[11px] text-cacau-500 mt-3 text-center">
-            Paga no dia · cancele grátis até {config.antecedenciaCancelHoras}h antes · falta gera multa de {config.multaPct}%
+            {comSinal
+              ? `Sinal de ${config.sinalPct}% no Pix confirma o horário · cancelou, o sinal volta · falta: fica o sinal + multa de ${config.multaComSinalPct}%`
+              : `Paga no dia · cancele grátis até ${config.antecedenciaCancelHoras}h antes · falta gera multa de ${config.multaPct}%`}
           </p>
         </aside>
       </div>
@@ -306,7 +343,14 @@ function Confirmado({ ag, config, telegramAtivo, onNovo }) {
         <Linha k="Serviço" v={ag.servicoNomes} />
         <Linha k="Data" v={dataLonga(ag.data)} />
         <Linha k="Horário" v={`${ag.hora} às ${fromMin(toMin(ag.hora) + ag.duracao)}`} />
-        <Linha k="Valor (pago no dia)" v={brl(ag.total)} forte />
+        {sinalPago(ag) ? (
+          <>
+            <Linha k="Sinal pago (Pix)" v={brl(sinalPago(ag))} />
+            <Linha k="Restante no dia" v={brl(restanteNoDia(ag))} forte />
+          </>
+        ) : (
+          <Linha k="Valor (pago no dia)" v={brl(ag.total)} forte />
+        )}
       </div>
       <div className="mb-6">
         <p className="text-sm text-cacau-700 mb-3">Salve na sua agenda para não esquecer:</p>
@@ -314,7 +358,7 @@ function Confirmado({ ag, config, telegramAtivo, onNovo }) {
         <p className="text-xs text-cacau-500 mt-3">Também te mandamos a confirmação por e-mail e um lembrete na véspera.</p>
       </div>
       <p className="text-xs text-cacau-500 mb-6">
-        Venha sem maquiagem nos olhos. Precisa desmarcar? Cancele em "Meus horários" até {config.antecedenciaCancelHoras}h antes. Faltas sem aviso geram multa de {config.multaPct}%.
+        Venha sem maquiagem nos olhos. Precisa desmarcar? Cancele em "Meus horários"{sinalPago(ag) ? ' e o sinal volta para o seu Pix' : ` até ${config.antecedenciaCancelHoras}h antes`}. Faltas sem aviso geram multa de {sinalPago(ag) ? `${config.multaComSinalPct}% (além do sinal)` : `${config.multaPct}%`}.
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <a href={`https://wa.me/${config.whatsapp}?text=${msg}`} target="_blank" rel="noreferrer" className="btn bg-white text-black hover:bg-white/85"><WhatsApp size={16} /> Avisar a Ana</a>

@@ -1,9 +1,11 @@
 import { toMin, fromMin, fromISO, toISO, addDays } from './format'
+import { aguardandoValido } from './sinal'
 
 /** Status que ocupam espaço na agenda. Falta e cancelado liberam o horário. */
 export const STATUS_OCUPA = ['agendado', 'concluido', 'bloqueio']
 
-export const ocupaAgenda = (a) => STATUS_OCUPA.includes(a.status)
+/** Esperando o Pix do sinal também segura o horário, mas só até o prazo acabar. */
+export const ocupaAgenda = (a) => STATUS_OCUPA.includes(a.status) || aguardandoValido(a)
 
 /**
  * Horário de funcionamento de um dia da semana (0 = domingo).

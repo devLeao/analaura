@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Copy, Check, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, QrCode, CalendarX2 } from 'lucide-react'
 import Modal from '../ui/Modal'
@@ -8,6 +8,8 @@ import { brl, dataCurta, dataLonga } from '../../lib/format'
 import { minutosAte } from '../../lib/schedule'
 import { gerarPix } from '../../lib/pix'
 import SalvarNaAgenda from './SalvarNaAgenda'
+import { PagarPix, AguardandoSinal } from './PagarPix'
+import { sinalPago, restanteNoDia, aguardandoValido } from '../../lib/sinal'
 
 // ---------------------------------------------------------------------------
 // Pagamento das pendências via Pix, todas de uma vez.
@@ -15,8 +17,15 @@ import SalvarNaAgenda from './SalvarNaAgenda'
 // automático entrar, o servidor baixa sozinho e esta tela já percebe e confirma.
 // ---------------------------------------------------------------------------
 export function PagarPendenciasModal({ pendencias, onFechar }) {
-  const { db } = useStore()
+  const { db, pixDasMultas } = useStore()
   const [copiado, setCopiado] = useState(false)
+  const [auto, setAuto] = useState({ pix: null, falhou: false })
+  const pedido = useRef(false)
+  useEffect(() => {
+    if (!pendencias?.length || pedido.current) return
+    pedido.current = true
+    pixDasMultas().then((r) => setAuto(r?.pix ? { pix: r.pix, falhou: false } : { pix: null, falhou: !r?.pago }))
+  }, [pendencias, pixDasMultas])
   if (!pendencias?.length) return null
   const total = pendencias.reduce((s, m) => s + m.valor, 0)
   const { config } = db
@@ -44,6 +53,14 @@ export function PagarPendenciasModal({ pendencias, onFechar }) {
           <p className="text-sm text-cacau-600 mb-6">Você já pode agendar normalmente.</p>
           <a href="#agendar" onClick={onFechar} className="btn-primary">Agendar agora</a>
         </div>
+      ) : auto.pix ? (
+        <div>
+          <ul className="text-sm text-cacau-600 mb-4 space-y-0.5 text-center">{pendencias.map((m) => <li key={m.id}>{m.descricao}</li>)}</ul>
+          <PagarPix valor={auto.pix.valor} pix={auto.pix} rotulo="Total a pagar" />
+          <p className="text-xs text-cacau-500 text-center mt-4">Assim que o Pix cair, sua agenda é liberada na hora.</p>
+        </div>
+      ) : !auto.falhou ? (
+        <div className="flex items-center justify-center gap-2 text-sm text-cacau-600 py-16"><Loader2 size={18} className="animate-spin" /> Gerando o Pix...</div>
       ) : (
         <div className="text-center">
           <ul className="text-sm text-cacau-600 mb-1 space-y-0.5">{pendencias.map((m) => <li key={m.id}>{m.descricao}</li>)}</ul>
@@ -86,11 +103,12 @@ const STATUS_INFO = {
 export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
   const { db, usuario, cancelarAgendamento, avisar } = useStore()
   const [confirmar, setConfirmar] = useState(null)
+  const [pagarSinal, setPagarSinal] = useState(null)
   if (!aberto || usuario?.tipo !== 'cliente') return null
 
   const { config } = db
   const meus = db.agendamentos.filter((a) => a.clienteId === usuario.id)
-  const futuros = meus.filter((a) => a.status === 'agendado' && minutosAte(a) > -60).sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora))
+  const futuros = meus.filter((a) => (a.status === 'agendado' || aguardandoValido(a)) && minutosAte(a) > -60).sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora))
   const historico = meus.filter((a) => !futuros.includes(a)).sort((a, b) => (b.data + b.hora).localeCompare(a.data + a.hora)).slice(0, 8)
   const pendencias = pendenciasAbertasDe(db, usuario.id)
   const limite = config.antecedenciaCancelHoras * 60
@@ -114,7 +132,9 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
       ) : (
         <ul className="space-y-2 mb-6">
           {futuros.map((a) => {
-            const podeCancelar = minutosAte(a) > limite
+            // com sinal pago ela sempre pode cancelar (o aviso diz se o sinal volta)
+            const podeCancelar = minutosAte(a) > limite || sinalPago(a) > 0
+            const esperandoPix = a.status === 'aguardando'
             return (
               <li key={a.id} className="bg-nude-50 border border-nude-200 rounded-2xl p-4">
                 <div className="flex items-center gap-4">
@@ -124,7 +144,12 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-cacau-900 font-medium">{a.servicoNomes}</div>
-                  <div className="text-xs text-cacau-500 mt-0.5">{a.hora} · {brl(a.total)} no dia</div>
+                  <div className="text-xs text-cacau-500 mt-0.5">
+                    {a.hora} · {sinalPago(a) ? `sinal pago · ${brl(restanteNoDia(a))} no dia` : `${brl(a.total)} no dia`}
+                  </div>
+                  {esperandoPix && (
+                    <button onClick={() => setPagarSinal(a.id)} className="btn-primary !py-1.5 !px-3 !text-[10px] mt-2"><QrCode size={13} /> Pagar sinal para confirmar</button>
+                  )}
                 </div>
                 {podeCancelar ? (
                   <button onClick={() => setConfirmar(a)} className="p-2 text-cacau-500 hover:text-red-400 hover:bg-red-500/10 rounded-full cursor-pointer" title="Cancelar horário">
@@ -143,9 +168,11 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
                   </a>
                 )}
                 </div>
-                <div className="mt-3 pt-3 border-t border-nude-200">
-                  <SalvarNaAgenda ag={a} config={config} telegramAtivo={!!usuario.telegramChatId} compacto />
-                </div>
+                {!esperandoPix && (
+                  <div className="mt-3 pt-3 border-t border-nude-200">
+                    <SalvarNaAgenda ag={a} config={config} telegramAtivo={!!usuario.telegramChatId} compacto />
+                  </div>
+                )}
               </li>
             )
           })}
@@ -173,7 +200,10 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
       )}
 
       <p className="flex items-start gap-2 text-[11px] text-cacau-500 mt-6">
-        <ShieldCheck size={14} className="shrink-0 mt-px" /> Cancelamento grátis aqui até {config.antecedenciaCancelHoras}h antes; depois disso, fale com a Ana pelo WhatsApp. Faltas sem aviso geram multa de {config.multaPct}%.
+        <ShieldCheck size={14} className="shrink-0 mt-px" />
+        {config.sinalAtivo
+          ? `Cancelou, o sinal volta para o seu Pix${config.devolverSinalTardio !== false ? '' : ` (até ${config.antecedenciaCancelHoras}h antes)`}. Falta sem aviso: o sinal fica com a Ana e gera multa de ${config.multaComSinalPct}%.`
+          : `Cancelamento grátis aqui até ${config.antecedenciaCancelHoras}h antes; depois disso, fale com a Ana pelo WhatsApp. Faltas sem aviso geram multa de ${config.multaPct}%.`}
       </p>
 
       <Modal
@@ -194,9 +224,25 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
       >
         {confirmar && (
           <p className="text-sm text-cacau-600">
-            {confirmar.servicoNomes} em {dataLonga(confirmar.data)} às {confirmar.hora}. Como faltam mais de {config.antecedenciaCancelHoras}h, não há nenhuma cobrança e o horário fica livre para outra cliente.
+            {confirmar.servicoNomes} em {dataLonga(confirmar.data)} às {confirmar.hora}.{' '}
+            {sinalPago(confirmar) > 0
+              ? minutosAte(confirmar) > limite || config.devolverSinalTardio !== false
+                ? `O sinal de ${brl(sinalPago(confirmar))} volta para o seu Pix em alguns minutos.`
+                : `Como faltam menos de ${config.antecedenciaCancelHoras}h, o sinal de ${brl(sinalPago(confirmar))} não é devolvido.`
+              : `Como faltam mais de ${config.antecedenciaCancelHoras}h, não há nenhuma cobrança.`}{' '}
+            O horário fica livre para outra cliente.
           </p>
         )}
+      </Modal>
+
+      <Modal aberto={!!pagarSinal} onFechar={() => setPagarSinal(null)} titulo="Pagar sinal">
+        {pagarSinal && (() => {
+          const ag = db.agendamentos.find((x) => x.id === pagarSinal)
+          if (!ag || ag.status !== 'aguardando') {
+            return <p className="text-sm text-cacau-600 text-center py-6">{ag?.status === 'agendado' ? 'Pago! Seu horário está confirmado.' : 'O tempo para pagar acabou e o horário foi liberado.'}</p>
+          }
+          return <AguardandoSinal ag={ag} onDesistir={() => setPagarSinal(null)} />
+        })()}
       </Modal>
     </Modal>
   )

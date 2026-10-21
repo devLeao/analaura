@@ -6,10 +6,11 @@ import { Status, Botao, Etiqueta, Campo } from './ui'
 import FichaCliente from './FichaCliente'
 import { EscolhaServicos, Pilulas } from './Escolhas'
 import { useStore } from '../../store/Store'
-import { brl, fromMin, toMin, dataLonga, duracaoLabel, waNumero, primeiroNome, multaDe } from '../../lib/format'
+import { brl, fromMin, toMin, dataLonga, duracaoLabel, waNumero, primeiroNome } from '../../lib/format'
 import { gerarSlots, intervalosOcupados, slotLivre } from '../../lib/schedule'
 import { itensDe } from '../../lib/catalogo'
 import { FORMAS_PAGAMENTO } from '../../lib/stats'
+import { multaPara, sinalPago, restanteNoDia } from '../../lib/sinal'
 
 /** Mensagens prontas de WhatsApp (a Ana só aperta enviar). */
 export const mensagens = {
@@ -25,7 +26,7 @@ export function AgendamentoCard({ ag, onAcao, compacto = false }) {
   const cliente = db.clientes.find((c) => c.id === ag.clienteId)
   const alergia = cliente?.ficha?.alergias
   const apagado = ag.status === 'cancelado' || ag.status === 'falta'
-  const barra = { agendado: 'bg-violet-400', concluido: 'bg-emerald-400', falta: 'bg-red-400', cancelado: 'bg-nude-300', bloqueio: 'bg-nude-400' }[ag.status]
+  const barra = { aguardando: 'bg-amber-400', agendado: 'bg-violet-400', concluido: 'bg-emerald-400', falta: 'bg-red-400', cancelado: 'bg-nude-300', bloqueio: 'bg-nude-400' }[ag.status]
 
   if (ag.status === 'bloqueio')
     return (
@@ -61,7 +62,10 @@ export function AgendamentoCard({ ag, onAcao, compacto = false }) {
           <div className="text-xs text-cacau-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums">
             <span>{ag.status === 'concluido' ? 'Recebido' : 'Valor'} <strong className="text-cacau-800 font-medium">{brl(ag.total)}</strong></span>
             {ag.status === 'concluido' && ag.pagamento && <span>via {FORMAS_PAGAMENTO[ag.pagamento.forma]?.toLowerCase()}</span>}
-            {ag.status === 'falta' && <span className="text-red-600">multa de {brl(multaDe(ag.total, db.config.multaPct))} gerada</span>}
+            {sinalPago(ag) > 0 && <span className="text-emerald-700">sinal {brl(sinalPago(ag))} pago no Pix{ag.status === 'agendado' ? ` · receber ${brl(restanteNoDia(ag))}` : ''}</span>}
+            {ag.sinal?.devolvidoEm && <span>sinal {brl(ag.sinal.valor)} devolvido</span>}
+            {ag.status === 'aguardando' && <span className="text-amber-700">esperando o Pix do sinal (horário segurado por alguns minutos)</span>}
+            {ag.status === 'falta' && <span className="text-red-600">multa de {brl(multaPara(ag, db.config))} gerada</span>}
           </div>
           {ag.nota && <p className="text-xs text-cacau-600 mt-1.5 flex items-start gap-1.5"><StickyNote size={12} className="mt-0.5 shrink-0 text-blush-600" /> {ag.nota}</p>}
         </div>
@@ -78,6 +82,9 @@ export function AgendamentoCard({ ag, onAcao, compacto = false }) {
             <IconeAcao titulo="Não compareceu" cor="hover:text-amber-700" onClick={() => onAcao('falta', ag)}><UserX size={17} /></IconeAcao>
             <IconeAcao titulo="Cancelar" cor="hover:text-red-600" onClick={() => onAcao('cancelar', ag)}><CalendarX2 size={17} /></IconeAcao>
           </>
+        )}
+        {ag.status === 'aguardando' && (
+          <IconeAcao titulo="Liberar o horário" cor="hover:text-red-600" onClick={() => onAcao('cancelar', ag)}><CalendarX2 size={17} /></IconeAcao>
         )}
         {ag.status === 'concluido' && !compacto && (
           <IconeAcao titulo="Desfazer (voltar para agendado)" onClick={() => onAcao('reabrir', ag)}><RotateCcw size={16} /></IconeAcao>
@@ -115,7 +122,9 @@ function ModaisAgendamento({ acao, onFechar }) {
   if (!acao || !ag) return null
   const fazer = (fn, msg) => { fn(); avisar(msg); onFechar() }
   const { tipo } = acao
-  const multa = multaDe(ag.total, db.config.multaPct)
+  const multa = multaPara(ag, db.config)
+  const pctMulta = sinalPago(ag) ? db.config.multaComSinalPct : db.config.multaPct
+  const sinal = sinalPago(ag)
 
   if (tipo === 'ficha') return <FichaCliente clienteId={ag.clienteId} onFechar={onFechar} />
 
@@ -124,10 +133,15 @@ function ModaisAgendamento({ acao, onFechar }) {
       <Modal aberto onFechar={onFechar} titulo="Atendimento concluído" sub={`${ag.clienteNome} · ${ag.servicoNomes}`}
         rodape={<><Botao onClick={onFechar}>Voltar</Botao><Botao variante="ok" onClick={() => fazer(() => st.concluirAtendimento(ag.id, { total: Number(valor) || 0, forma }), 'Atendimento concluído.')}><Check size={16} /> Concluir</Botao></>}>
         <div className="space-y-5">
-          <Campo rotulo="Valor recebido (R$)" dica="Ajuste se cobrou diferente (desconto, serviço extra).">
+          {sinal > 0 && (
+            <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
+              Sinal de <strong>{brl(sinal)}</strong> já pago no Pix. Receber hoje: <strong>{brl(Math.max(0, (Number(valor) || 0) - sinal))}</strong>.
+            </p>
+          )}
+          <Campo rotulo={sinal > 0 ? 'Valor total do atendimento (R$), com o sinal' : 'Valor recebido (R$)'} dica="Ajuste se cobrou diferente (desconto, serviço extra).">
             <input className="input tabular-nums" type="number" step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} />
           </Campo>
-          <Campo rotulo="Como ela pagou?">
+          <Campo rotulo={sinal > 0 ? 'Como ela pagou o restante?' : 'Como ela pagou?'}>
             <Pilulas valor={forma} onChange={setForma} opcoes={[['pix', 'Pix'], ['cartao', 'Cartão'], ['dinheiro', 'Dinheiro']]} />
           </Campo>
         </div>
@@ -142,7 +156,8 @@ function ModaisAgendamento({ acao, onFechar }) {
           <AlertTriangle className="text-amber-600 shrink-0" size={22} />
           <div className="text-sm text-cacau-600 space-y-2">
             <p><strong className="text-cacau-900">{ag.clienteNome}</strong> não compareceu em {dataLonga(ag.data).toLowerCase()} às {ag.hora}.</p>
-            <p>Será gerada uma multa de <strong className="text-cacau-900">{brl(multa)}</strong> ({db.config.multaPct}% de {brl(ag.total)}). Ela só volta a agendar pelo site depois de pagar.</p>
+            {sinal > 0 && <p>Você fica com o sinal de <strong className="text-cacau-900">{brl(sinal)}</strong> que ela já pagou.</p>}
+            <p>{sinal > 0 ? 'E será' : 'Será'} gerada uma multa de <strong className="text-cacau-900">{brl(multa)}</strong> ({pctMulta}% de {brl(ag.total)}). Ela só volta a agendar pelo site depois de pagar.</p>
             <p>O horário fica livre para encaixar outra cliente.</p>
           </div>
         </div>
@@ -156,12 +171,14 @@ function ModaisAgendamento({ acao, onFechar }) {
         <div className="grid sm:grid-cols-2 gap-3">
           <button onClick={() => fazer(() => st.cancelarAgendamento(ag.id), 'Horário cancelado e liberado.')} className="text-left rounded-2xl border border-nude-300 hover:border-cacau-500 p-4 cursor-pointer">
             <div className="text-cacau-900 font-medium text-sm mb-1">Cancelar sem multa</div>
-            <div className="text-xs text-cacau-600">Ela avisou com antecedência ou foi você que desmarcou.</div>
+            <div className="text-xs text-cacau-600">Ela avisou com antecedência ou foi você que desmarcou.{sinal > 0 && ` O sinal de ${brl(sinal)} volta para ela no Pix.`}</div>
           </button>
+          {ag.status !== 'aguardando' && (
           <button onClick={() => fazer(() => st.marcarFalta(ag.id, 'cancelou_tarde'), `Horário liberado e multa de ${brl(multa)} gerada.`)} className="text-left rounded-2xl border border-amber-300 bg-amber-50/60 hover:border-amber-500 p-4 cursor-pointer">
             <div className="text-amber-900 font-medium text-sm mb-1">Cancelar com multa de {brl(multa)}</div>
-            <div className="text-xs text-cacau-600">Avisou em cima da hora. Libera o horário e cobra {db.config.multaPct}%.</div>
+            <div className="text-xs text-cacau-600">Avisou em cima da hora. Libera o horário e cobra {pctMulta}%{sinal > 0 && `, e você fica com o sinal de ${brl(sinal)}`}.</div>
           </button>
+          )}
         </div>
       </Modal>
     )

@@ -5,9 +5,10 @@ import {
 } from 'firebase/firestore'
 import { auth, fs, googleProvider, SUPER_ADMIN } from '../lib/firebase'
 import { CONFIG_PADRAO, SERVICOS } from '../data/seed'
-import { uid, toISO, brl, dataBR, multaDe, addDays } from '../lib/format'
+import { uid, toISO, brl, dataBR, addDays } from '../lib/format'
 import { itensDe } from '../lib/catalogo'
 import { ocupaAgenda } from '../lib/schedule'
+import { sinalLigado, multaPara, aguardandoExpirado } from '../lib/sinal'
 
 // ---------------------------------------------------------------------------
 // Store: dados em tempo real do Firestore + login com Google.
@@ -34,7 +35,8 @@ const ref = (col, id) => doc(fs, col, id)
 const novoId = (col) => doc(collection(fs, col)).id
 
 /** Registro público do horário ocupado (sem nome, telefone ou valores). */
-const ocupadoDe = (ag) => limpar({ data: ag.data, hora: ag.hora, duracao: ag.duracao, status: ag.status, diaInteiro: ag.diaInteiro || false })
+const ocupadoDe = (ag) =>
+  limpar({ data: ag.data, hora: ag.hora, duracao: ag.duracao, status: ag.status, diaInteiro: ag.diaInteiro || false, ...(ag.expiraEm ? { expiraEm: ag.expiraEm } : {}) })
 
 /** Mantém `ocupados/{id}` igual ao agendamento: existe enquanto ele ocupa a agenda. */
 const sincronizarOcupado = (batch, ag) => {
@@ -46,16 +48,18 @@ const sincronizarOcupado = (batch, ag) => {
  * Pede ao servidor (api/avisos) os avisos de um agendamento: Telegram da Ana,
  * Google Agenda e e-mail da cliente. Não trava a tela se falhar (ex.: rodando local).
  */
-const avisarServidor = async (tipo, id) => {
+const chamarServidor = async (caminho, corpo) => {
   try {
     const token = await auth.currentUser?.getIdToken()
     if (!token) return null
-    const r = await fetch('/api/avisos', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ tipo, id }) })
-    return r.ok ? await r.json() : { erro: `O servidor respondeu com erro ${r.status}.` }
+    const r = await fetch(caminho, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(corpo) })
+    const j = await r.json().catch(() => null)
+    return r.ok ? j : { erro: j?.erro || `O servidor respondeu com erro ${r.status}.` }
   } catch {
-    return null
+    return { erro: 'Sem conexão com o servidor. Tente de novo.' }
   }
 }
+const avisarServidor = (tipo, id) => chamarServidor('/api/avisos', { tipo, id })
 
 const notificacao = (n) => ({ criadoEm: new Date().toISOString(), lida: false, ...n })
 
@@ -213,18 +217,36 @@ export function StoreProvider({ children }) {
       sair: () => signOut(auth),
 
       // ---------- Agendamentos ----------
-      /** Pelo site: já fica confirmado (sem sinal) e a Ana é notificada. Devolve o id. */
-      criarAgendamento: (ag) => {
+      /**
+       * Pelo site. Com sinal ligado, o horário fica "aguardando" (segurado por alguns minutos) até o Pix cair;
+       * quem confirma é o servidor (api/mercadopago). Sem sinal, já fica confirmado.
+       * Devolve o id depois de gravar (ou null se falhou).
+       */
+      criarAgendamento: async (ag) => {
         const id = novoId('agendamentos')
-        const novo = limpar({ criadoEm: toISO(new Date()), status: 'agendado', origem: 'site', pagamento: null, nota: '', ...ag })
+        const comSinal = sinalLigado(cfg())
+        const novo = limpar({
+          criadoEm: toISO(new Date()), origem: 'site', pagamento: null, nota: '', ...ag,
+          status: comSinal ? 'aguardando' : 'agendado',
+          ...(comSinal ? { expiraEm: Date.now() + Math.min(Number(cfg().prazoSinalMin) || 15, 30) * 60e3 } : {}),
+        })
         const b = writeBatch(fs)
         b.set(ref('agendamentos', id), novo)
         b.set(ref('ocupados', id), ocupadoDe(novo))
-        b.set(doc(collection(fs, 'notificacoes')), notificacao({ tipo: 'agendamento', titulo: 'Novo agendamento pelo site', texto: `${ag.clienteNome} · ${ag.servicoNomes} · ${dataBR(ag.data)} às ${ag.hora}` }))
+        if (!comSinal) b.set(doc(collection(fs, 'notificacoes')), notificacao({ tipo: 'agendamento', titulo: 'Novo agendamento pelo site', texto: `${ag.clienteNome} · ${ag.servicoNomes} · ${dataBR(ag.data)} às ${ag.hora}` }))
         if (ag.clienteId && ag.clienteTelefone) b.set(ref('clientes', ag.clienteId), { telefone: ag.clienteTelefone }, { merge: true })
-        gravar(b.commit()).then(() => avisarServidor('novo', id))
+        try {
+          await gravar(b.commit())
+        } catch {
+          return null
+        }
+        if (!comSinal) avisarServidor('novo', id)
         return id
       },
+      /** Pix do sinal de um horário "aguardando" (o servidor calcula o valor). */
+      pixDoSinal: (id) => chamarServidor('/api/pix', { tipo: 'sinal', id }),
+      /** Pix de todas as multas em aberto da cliente logada. */
+      pixDasMultas: () => chamarServidor('/api/pix', { tipo: 'multa' }),
       criarAgendamentoAdmin: (ag) => {
         const id = novoId('agendamentos')
         const novo = limpar({ criadoEm: toISO(new Date()), status: 'agendado', pagamento: null, nota: '', ...ag, origem: 'admin' })
@@ -258,7 +280,7 @@ export function StoreProvider({ children }) {
           b.set(doc(collection(fs, 'pendencias')), limpar({
             clienteId: ag.clienteId, clienteNome: ag.clienteNome, agendamentoId: ag.id, tipo: 'falta',
             descricao: `${motivo === 'cancelou_tarde' ? 'Cancelamento em cima da hora' : 'Falta'} em ${dataBR(ag.data)} (${ag.servicoNomes})`,
-            valor: multaDe(ag.total, cfg().multaPct), status: 'aberta', bloqueia: true, criadaEm: toISO(new Date()), pagaEm: null, via: null,
+            valor: multaPara(ag, cfg()), status: 'aberta', bloqueia: true, criadaEm: toISO(new Date()), pagaEm: null, via: null,
           }))
         )
       },
@@ -383,7 +405,8 @@ export function StoreProvider({ children }) {
       // Enquanto a admin não publicar os serviços, o site mostra o catálogo padrão
       servicos: servicos?.length ? servicos : SERVICOS,
       ocupados,
-      agendamentos,
+      // horários que esperaram o Pix e venceram somem das listas (o horário já está livre)
+      agendamentos: agendamentos.filter((a) => a.status !== 'expirado' && !aguardandoExpirado(a)),
       clientes: clientesComFicha,
       pendencias,
       notificacoes,

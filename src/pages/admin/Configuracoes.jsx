@@ -5,6 +5,7 @@ import { SUPER_ADMIN } from '../../lib/firebase'
 import { Cabecalho, Botao, Secao, Campo, Toggle } from '../../components/admin/ui'
 import { Telegram } from '../../components/ui/Icones'
 import { DIAS, brl, multaDe } from '../../lib/format'
+import { valorSinal } from '../../lib/sinal'
 
 export default function Configuracoes() {
   const { db, salvarConfig, adicionarAdmin, removerAdmin, conectarTelegram, testarAvisos, avisar } = useStore()
@@ -57,19 +58,51 @@ export default function Configuracoes() {
           <p className="text-xs text-cacau-500 mt-3">Os horários de início aparecem de {f.slotMin} em {f.slotMin} minutos. Sem pausa preenchida, a agenda corre direto.</p>
         </Secao>
 
-        <Secao titulo="Cancelamento e multa" icone={Receipt}>
-          <div className="grid grid-cols-2 gap-3">
-            <Campo rotulo="Cliente cancela pelo site até (horas antes)"><input type="number" min="0" className="input" value={f.antecedenciaCancelHoras} onChange={set('antecedenciaCancelHoras', true)} /></Campo>
-            <Campo rotulo="Multa por falta (%)"><input type="number" min="0" max="100" className="input" value={f.multaPct} onChange={set('multaPct', true)} /></Campo>
+        <Secao titulo="Sinal, cancelamento e multa" icone={Receipt}>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <p className="text-sm font-medium text-cacau-900">Cobrar sinal no Pix para agendar</p>
+              <p className="text-xs text-cacau-500 mt-0.5">O Pix é gerado pelo Mercado Pago e confirmado sozinho.</p>
+            </div>
+            <Toggle ligado={!!f.sinalAtivo} onChange={(v) => setF({ ...f, sinalAtivo: v })} />
           </div>
+          {f.sinalAtivo && (
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <Campo rotulo="Sinal (%)"><input type="number" min="1" max="100" className="input" value={f.sinalPct} onChange={set('sinalPct', true)} /></Campo>
+              <Campo rotulo="Multa se faltar (%)" dica="além do sinal"><input type="number" min="0" max="100" className="input" value={f.multaComSinalPct} onChange={set('multaComSinalPct', true)} /></Campo>
+              <Campo rotulo="Prazo p/ pagar (min)"><input type="number" min="5" max="30" className="input" value={f.prazoSinalMin} onChange={set('prazoSinalMin', true)} /></Campo>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <Campo rotulo="Cancelamento livre até (horas antes)"><input type="number" min="0" className="input" value={f.antecedenciaCancelHoras} onChange={set('antecedenciaCancelHoras', true)} /></Campo>
+            {!f.sinalAtivo && <Campo rotulo="Multa por falta (%)"><input type="number" min="0" max="100" className="input" value={f.multaPct} onChange={set('multaPct', true)} /></Campo>}
+          </div>
+          {f.sinalAtivo && (
+            <div className="flex items-start justify-between gap-4 mt-4">
+              <div>
+                <p className="text-sm font-medium text-cacau-900">Devolver o sinal mesmo em cima da hora</p>
+                <p className="text-xs text-cacau-500 mt-0.5">Desligado: cancelando com menos de {f.antecedenciaCancelHoras}h, você fica com o sinal.</p>
+              </div>
+              <Toggle ligado={f.devolverSinalTardio !== false} onChange={(v) => setF({ ...f, devolverSinalTardio: v })} />
+            </div>
+          )}
           <div className="mt-4 bg-nude-50 rounded-2xl p-4 text-xs text-cacau-600 space-y-1.5 leading-relaxed">
-            <p><strong className="text-cacau-900">Como fica:</strong> sem sinal; a cliente paga no dia. Se faltar no {ex.nome} ({brl(ex.preco)}), gera multa de <strong className="text-cacau-900">{brl(multaDe(ex.preco, f.multaPct))}</strong>.</p>
-            <p>Com multa em aberto, ela não consegue agendar pelo site até pagar (Pix no próprio site).</p>
-            <p>Faltando menos de {f.antecedenciaCancelHoras}h, ela não consegue cancelar sozinha e o site pede para falar com você.</p>
-            <p>O prazo de manutenção de cada modelo fica em Serviços.</p>
+            {f.sinalAtivo ? (
+              <>
+                <p><strong className="text-cacau-900">Como fica:</strong> no {ex.nome} ({brl(ex.preco)}), a cliente paga <strong className="text-cacau-900">{brl(valorSinal(ex.preco, f))}</strong> de sinal no Pix e o restante no dia. Ela tem {f.prazoSinalMin} min para pagar, senão o horário volta a ficar livre.</p>
+                <p>Se ela cancelar, o sinal volta sozinho para o Pix dela{f.devolverSinalTardio !== false ? '' : ` (só com mais de ${f.antecedenciaCancelHoras}h de antecedência)`}. Se você cancelar, também volta.</p>
+                <p>Se faltar: você fica com o sinal e gera multa de <strong className="text-cacau-900">{brl(multaDe(ex.preco, f.multaComSinalPct))}</strong> ({f.multaComSinalPct}%). Total: {f.sinalPct + f.multaComSinalPct}%.</p>
+              </>
+            ) : (
+              <>
+                <p><strong className="text-cacau-900">Como fica:</strong> sem sinal; a cliente paga no dia. Se faltar no {ex.nome} ({brl(ex.preco)}), gera multa de <strong className="text-cacau-900">{brl(multaDe(ex.preco, f.multaPct))}</strong>.</p>
+                <p>Faltando menos de {f.antecedenciaCancelHoras}h, ela não consegue cancelar sozinha e o site pede para falar com você.</p>
+              </>
+            )}
+            <p>Com multa em aberto, ela não consegue agendar pelo site até pagar (Pix no próprio site, baixa automática).</p>
           </div>
 
-          <h4 className="text-sm font-semibold text-cacau-900 mt-6 mb-3 flex items-center gap-2"><QrCode size={16} className="text-blush-600" /> Pix para pagamento de multas</h4>
+          <h4 className="text-sm font-semibold text-cacau-900 mt-6 mb-3 flex items-center gap-2"><QrCode size={16} className="text-blush-600" /> Pix reserva (se o Mercado Pago estiver fora do ar)</h4>
           <div className="grid gap-3">
             <Campo rotulo="Chave Pix"><input className="input" value={f.pixChave} onChange={set('pixChave')} /></Campo>
             <div className="grid grid-cols-2 gap-3">

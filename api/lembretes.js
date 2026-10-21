@@ -3,6 +3,7 @@
 //  - manda pra Ana, no Telegram, a agenda de amanhã
 import { db, lerDoc, todas, telegram, email, modeloEmail, esc, dataBR, dataLonga, brl, primeiroNome, SITE } from './_lib/servidor.js'
 import { horaFim, linkGoogleAgenda } from '../src/lib/lembretes.js'
+import { sinalPago, restanteNoDia } from '../src/lib/sinal.js'
 
 export default async function handler(req, res) {
   if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) return res.status(401).end()
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
         modeloEmail({
           titulo: 'Te espero amanhã!',
           texto: `Oi, ${esc(primeiroNome(ag.clienteNome))}! Passando para lembrar do seu horário.`,
-          linhas: [['Serviço', ag.servicoNomes], ['Data', dataLonga(ag.data)], ['Horário', `${ag.hora} às ${horaFim(ag)}`], ['Valor (pago no dia)', brl(ag.total)]],
+          linhas: [['Serviço', ag.servicoNomes], ['Data', dataLonga(ag.data)], ['Horário', `${ag.hora} às ${horaFim(ag)}`], sinalPago(ag) ? ['A pagar no dia', brl(restanteNoDia(ag))] : ['Valor (pago no dia)', brl(ag.total)]],
           botoes: [['Ver no Google Agenda', linkGoogleAgenda(ag, config)], ['Meus horários', `${SITE}/#agendar`]],
           rodape: `Endereço: ${esc([config?.endereco, config?.cidade].filter(Boolean).join(', '))}<br>Tolerância de atraso: 10 minutos. Venha sem maquiagem nos olhos.`,
         })
@@ -49,5 +50,17 @@ export default async function handler(req, res) {
     await db().doc('privado/telegram').set({ resumoDe: amanha }, { merge: true })
   }
 
-  res.json({ ok: true, amanha, lembretes: ags.length })
+  // Limpeza: horários que ficaram esperando o Pix do sinal e venceram (o Pix do Mercado Pago vale 30 min)
+  const pendentes = await db().collection('agendamentos').where('status', '==', 'aguardando').get()
+  const vencidos = pendentes.docs.filter((d) => new Date(d.get('expiraEm') || 0).getTime() < Date.now() - 45 * 60e3)
+  if (vencidos.length) {
+    const b = db().batch()
+    vencidos.forEach((d) => {
+      b.update(d.ref, { status: 'expirado' })
+      b.delete(db().doc(`ocupados/${d.id}`))
+    })
+    await b.commit()
+  }
+
+  res.json({ ok: true, amanha, lembretes: ags.length, expirados: vencidos.length })
 }
