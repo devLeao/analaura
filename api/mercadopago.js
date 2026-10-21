@@ -21,7 +21,13 @@ export function assinaturaValida(req) {
   return esperado.length === partes.v1.length && timingSafeEqual(Buffer.from(esperado), Buffer.from(partes.v1))
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
+  // TEMPORÁRIO: confere se as chaves estão no Vercel (sem mostrar valores)
+  if (req.method === 'GET' && req.query.conferir === '1') {
+    const token = process.env.MERCADOPAGO_ACCESS_TOKEN
+    const r = token ? await fetch('https://api.mercadopago.com/users/me', { headers: { Authorization: `Bearer ${token}` } }) : null
+    return res.json({ accessToken: !token ? 'FALTA' : r.ok ? 'ok (aceito pelo Mercado Pago)' : `recusado (${r.status})`, webhookSecret: process.env.MERCADOPAGO_WEBHOOK_SECRET ? 'presente' : 'FALTA' })
+  }
   if (req.method !== 'POST') return res.status(200).send('ok')
   const valida = assinaturaValida(req)
   console.log('mercadopago', { tipo: req.body?.type, acao: req.body?.action, id: req.body?.data?.id, assinatura: valida ? 'ok' : 'inválida' })
