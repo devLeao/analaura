@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
 import { StoreProvider } from './store/Store'
 import Site from './pages/Site'
+import Privacidade from './pages/Privacidade'
 import Toast from './components/ui/Toast'
 
 // O painel só é baixado quando alguém acessa /admin
@@ -15,6 +16,7 @@ createRoot(document.getElementById('root')).render(
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Site />} />
+          <Route path="/privacidade" element={<Privacidade />} />
           <Route
             path="/admin/*"
             element={

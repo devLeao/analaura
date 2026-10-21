@@ -9,6 +9,7 @@ import { linkWhats } from '../../components/admin/AgendamentoCard'
 import { WhatsApp } from '../../components/ui/Icones'
 import Modal from '../../components/ui/Modal'
 import { calcularStats, variacao, movimentacoes, FORMAS_PAGAMENTO } from '../../lib/stats'
+import { sinalPago } from '../../lib/sinal'
 import { brl, toISO, fromISO, addDays, DIAS_CURTOS, dataCurta, dataBR, toMin, primeiroNome } from '../../lib/format'
 import { diasAbertos, horarioDaSemana } from '../../lib/schedule'
 
@@ -93,7 +94,9 @@ function Resumo({ ini, fim }) {
   // Tudo que já está marcado daqui pra frente (independe do período escolhido)
   const hoje = toISO(new Date())
   const futuros = db.agendamentos.filter((x) => x.data >= hoje && x.status === 'agendado')
-  const aReceber = futuros.reduce((x, g) => x + g.total, 0)
+  // o sinal já pago desses horários não entra no "a receber"
+  const sinaisFuturos = futuros.reduce((x, g) => x + sinalPago(g), 0)
+  const aReceber = futuros.reduce((x, g) => x + g.total, 0) - sinaisFuturos
 
   // Para períodos longos, agrupa por semana
   const porSemana = dias > 45
@@ -125,13 +128,13 @@ function Resumo({ ini, fim }) {
     <>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Kpi icone={Wallet} rotulo="Faturamento" valor={brl(s.faturamento)} detalhe={<Delta v={variacao(s.faturamento, a.faturamento)} />} tom="bom" />
-        <Kpi icone={HandCoins} rotulo="Entrou no caixa" valor={brl(caixa)} detalhe="atendimentos + multas pagas" tom="info" />
+        <Kpi icone={HandCoins} rotulo="Entrou no caixa" valor={brl(caixa)} detalhe="atendimentos + multas + sinais retidos" tom="info" />
         <Kpi icone={Sparkles} rotulo="Atendimentos" valor={s.concluidos.length} detalhe={<Delta v={variacao(s.concluidos.length, a.concluidos.length)} />} />
         <Kpi icone={Ticket} rotulo="Ticket médio" valor={brl(s.ticket)} detalhe={<Delta v={variacao(s.ticket, a.ticket)} />} />
         <Kpi icone={Users} rotulo="Clientes atendidas" valor={s.atendidas} detalhe={`${s.novas} novas · ${s.recorrentes} que voltaram`} />
         <Kpi icone={UserX} rotulo="Faltas" valor={`${s.faltas.length} · ${pct(s.taxaFalta)}`} detalhe={<Delta v={variacao(s.faltas.length, a.faltas.length)} menorMelhor />} tom="critico" />
-        <Kpi icone={Receipt} rotulo="Multas recebidas" valor={brl(s.multasRecebidas)} detalhe={`${brl(s.multasGeradas)} geradas · ${brl(s.perdaFaltas)} perdidos com faltas`} tom="alerta" />
-        <Kpi icone={Wallet} rotulo="A receber da agenda futura" valor={brl(aReceber)} detalhe={`${futuros.length} horário(s) marcado(s) a partir de hoje`} />
+        <Kpi icone={Receipt} rotulo="Multas e sinais retidos" valor={brl(s.multasRecebidas + s.sinaisRetidos)} detalhe={`${brl(s.multasRecebidas)} em multas pagas · ${brl(s.sinaisRetidos)} em sinais de faltas · ${brl(s.multasGeradas)} em multas geradas`} tom="alerta" />
+        <Kpi icone={Wallet} rotulo="A receber da agenda futura" valor={brl(aReceber)} detalhe={`${futuros.length} horário(s) a partir de hoje${sinaisFuturos ? ` · ${brl(sinaisFuturos)} de sinal já recebido` : ''}`} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 mb-6 items-start">
@@ -254,7 +257,7 @@ function Caixa({ ini, fim }) {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Kpi icone={ArrowDownLeft} rotulo="Total que entrou" valor={brl(soma(movs))} detalhe={`${movs.length} entradas`} tom="bom" />
         <Kpi icone={Wallet} rotulo="Atendimentos" valor={brl(soma(movs.filter((m) => m.tipo === 'Atendimento')))} detalhe={`${movs.filter((m) => m.tipo === 'Atendimento').length} pagamentos`} />
-        <Kpi icone={Receipt} rotulo="Multas pagas" valor={brl(soma(movs.filter((m) => m.tipo === 'Multa')))} tom="alerta" />
+        <Kpi icone={Receipt} rotulo="Multas e sinais retidos" valor={brl(soma(movs.filter((m) => m.tipo === 'Multa' || m.tipo === 'Sinal retido')))} detalhe={`${brl(soma(movs.filter((m) => m.tipo === 'Sinal retido')))} de sinais`} tom="alerta" />
         <Kpi icone={HandCoins} rotulo="Débitos quitados" valor={brl(soma(movs.filter((m) => m.tipo === 'Débito')))} />
       </div>
 
@@ -265,7 +268,7 @@ function Caixa({ ini, fim }) {
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <Abas valor={tipo} onChange={setTipo} abas={[['todos', 'Tudo', movs.length], ['Atendimento', 'Atendimentos'], ['Multa', 'Multas'], ['Débito', 'Débitos']]} />
+        <Abas valor={tipo} onChange={setTipo} abas={[['todos', 'Tudo', movs.length], ['Atendimento', 'Atendimentos'], ['Multa', 'Multas'], ['Sinal retido', 'Sinais retidos'], ['Débito', 'Débitos']]} />
         <Botao onClick={exportar}><Download size={16} /> Exportar planilha</Botao>
       </div>
 

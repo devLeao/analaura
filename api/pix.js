@@ -54,7 +54,16 @@ async function pixDasMultas(quem) {
   const snap = await db().collection('pendencias').where('clienteId', '==', quem.uid).where('status', '==', 'aberta').get()
   const pend = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
   if (!pend.length) return { pago: true }
-  const valor = pend.reduce((s, p) => s + (Number(p.valor) || 0), 0)
+  const valor = Math.round(pend.reduce((s, p) => s + (Number(p.valor) || 0), 0) * 100) / 100
+  const ids = pend.map((p) => p.id).sort().join(',')
+
+  // Reaproveita um Pix ainda válido das mesmas multas (evita criar uma cobrança a cada clique)
+  const anteriores = await db().collection('cobrancas').where('clienteId', '==', quem.uid).get()
+  const valido = anteriores.docs
+    .map((d) => d.data())
+    .find((c) => c.tipo === 'multa' && c.status === 'pendente' && c.pix && [...(c.pendenciaIds || [])].sort().join(',') === ids && new Date(c.pix.venceEm).getTime() > Date.now() + 2 * 60e3)
+  if (valido) return { pix: valido.pix }
+
   const pix = await criarPix({
     valor,
     email: quem.email,

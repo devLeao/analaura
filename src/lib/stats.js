@@ -1,5 +1,9 @@
 import { toISO, fromISO, addDays, diasEntreISO } from './format'
 import { resolver } from './catalogo'
+import { sinalPago } from './sinal'
+
+/** Sinal que ficou com a Ana: a cliente faltou (ou cancelou em cima da hora sem devolução). */
+export const sinalRetido = (a) => ((a.status === 'falta' || a.status === 'cancelado') ? sinalPago(a) : 0)
 
 export const FORMAS_PAGAMENTO = { pix: 'Pix', cartao: 'Cartão', dinheiro: 'Dinheiro', manual: 'Pago por fora' }
 
@@ -24,6 +28,7 @@ export function calcularStats(db, ini, fim) {
   const multasPeriodo = db.pendencias.filter((m) => m.tipo === 'falta' && m.criadaEm >= ini && m.criadaEm <= fim)
   const multasRecebidas = db.pendencias.filter((m) => m.status === 'paga' && m.pagaEm >= ini && m.pagaEm <= fim)
   const abertas = db.pendencias.filter((m) => m.status === 'aberta')
+  const sinaisRetidos = ags.reduce((s, a) => s + sinalRetido(a), 0)
 
   // Primeiro atendimento de cada cliente (para novas x recorrentes)
   const primeiraVisita = {}
@@ -105,6 +110,7 @@ export function calcularStats(db, ini, fim) {
     perdaFaltas: soma(faltas),
     multasGeradas: multasPeriodo.reduce((s, m) => s + m.valor, 0),
     multasRecebidas: multasRecebidas.reduce((s, m) => s + m.valor, 0),
+    sinaisRetidos,
     abertasValor: abertas.reduce((s, m) => s + m.valor, 0),
     atendidas: atendidas.size,
     novas,
@@ -124,13 +130,18 @@ export function calcularStats(db, ini, fim) {
 /** Variação percentual entre dois valores (null se não dá pra comparar). */
 export const variacao = (atual, anterior) => (anterior ? (atual - anterior) / anterior : null)
 
-/** Livro-caixa: cada dinheiro que entrou (atendimentos pagos e multas/débitos quitados). */
+/** Livro-caixa: cada dinheiro que entrou (atendimentos pagos, sinais retidos e multas/débitos quitados). */
 export function movimentacoes(db, ini, fim) {
   const out = []
   const dentro = (iso) => iso && iso >= ini && iso <= fim
   for (const a of db.agendamentos) {
     if (a.status === 'concluido' && a.total > 0 && dentro(a.pagamento?.em || a.data))
       out.push({ id: `a-${a.id}`, data: a.pagamento?.em || a.data, tipo: 'Atendimento', cliente: a.clienteNome, descricao: a.servicoNomes, forma: a.pagamento?.forma || 'pix', valor: a.total })
+  }
+  for (const a of db.agendamentos) {
+    const v = sinalRetido(a)
+    if (v > 0 && dentro(a.data))
+      out.push({ id: `s-${a.id}`, data: a.data, tipo: 'Sinal retido', cliente: a.clienteNome, descricao: `Sinal (${a.status === 'falta' ? 'faltou' : 'cancelou em cima da hora'}) · ${a.servicoNomes}`, forma: 'pix', valor: v })
   }
   for (const p of db.pendencias) {
     if (p.status === 'paga' && dentro(p.pagaEm))

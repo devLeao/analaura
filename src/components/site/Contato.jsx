@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { MapPin, Phone } from 'lucide-react'
 import { TituloSecao } from '../ui/Ornamento'
 import { WhatsApp, Instagram } from '../ui/Icones'
@@ -82,6 +83,7 @@ export function Rodape() {
           </div>
           <p className="text-xs text-white/40 text-center md:text-right">
             © {new Date().getFullYear()} {config.marca} · {config.slogan}
+            <br /><Link to="/privacidade" className="text-white/70 hover:text-white">Política de privacidade</Link>
             <br />Desenvolvido por <a href="https://devleao.netlify.app/" target="_blank" rel="noreferrer" className="text-white/70 hover:text-white">DevLeão</a>
           </p>
         </div>

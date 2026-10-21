@@ -46,7 +46,7 @@ export async function criarPix({ valor, email, referencia, cobranca }) {
     link: pag.payment_method?.ticket_url || '',
     venceEm: new Date(Date.now() + 30 * 60e3).toISOString(),
   }
-  await db().doc(`cobrancas/${order.id}`).set({ ...cobranca, valor: pix.valor, status: 'pendente', criadaEm: new Date().toISOString() })
+  await db().doc(`cobrancas/${order.id}`).set({ ...cobranca, valor: pix.valor, status: 'pendente', criadaEm: new Date().toISOString(), pix })
   return pix
 }
 

@@ -112,6 +112,7 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
         <h3 className="font-display text-3xl text-cacau-900 font-semibold mb-2">Entre para agendar</h3>
         <p className="text-cacau-600 mb-8 text-sm leading-relaxed">É rapidinho: entre com sua conta Google. Assim você acompanha e cancela seus horários quando precisar.</p>
         <button onClick={onLogin} className="btn-primary"><GoogleG /> Entrar com Google</button>
+        <p className="text-[11px] text-cacau-500 mt-5">Ao entrar e agendar, você concorda com a nossa <Link to="/privacidade" className="underline underline-offset-4 hover:text-cacau-900">política de privacidade</Link>.</p>
       </div>
     )
   } else if (usuario.tipo === 'admin') {

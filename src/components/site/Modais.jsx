@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Copy, Check, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, QrCode, CalendarX2 } from 'lucide-react'
 import Modal from '../ui/Modal'
@@ -204,6 +205,18 @@ export function MinhaContaModal({ aberto, onFechar, onPagarPendencias }) {
         {config.sinalAtivo
           ? `Cancelou, o sinal volta para o seu Pix${config.devolverSinalTardio !== false ? '' : ` (até ${config.antecedenciaCancelHoras}h antes)`}. Falta sem aviso: o sinal fica com a Ana e gera multa de ${config.multaComSinalPct}%.`
           : `Cancelamento grátis aqui até ${config.antecedenciaCancelHoras}h antes; depois disso, fale com a Ana pelo WhatsApp. Faltas sem aviso geram multa de ${config.multaPct}%.`}
+      </p>
+
+      <p className="text-[11px] text-cacau-500 mt-3">
+        Seus dados: <Link to="/privacidade" onClick={onFechar} className="underline underline-offset-4 hover:text-cacau-900">política de privacidade</Link> ·{' '}
+        <a
+          href={`https://wa.me/${config.whatsapp}?text=${encodeURIComponent(`Oi! Quero pedir a exclusão dos meus dados do site (conta ${usuario.email}).`)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4 hover:text-cacau-900"
+        >
+          pedir exclusão
+        </a>
       </p>
 
       <Modal

@@ -1,85 +1,105 @@
-# Laura Célvio · Lash Designer — esboço
+# Laura Célvio · Lash Designer
 
-Site + painel administrativo do estúdio de extensão de cílios e sobrancelhas.
-**Esboço:** serviços, preços, horários, contato, fotos e logotipo já são os da Ana; login, pagamento e clientes
-ainda são fictícios. Tudo fica salvo no navegador (localStorage); nada vai para servidor.
+Site + painel administrativo do estúdio de extensão de cílios e sobrancelhas da Ana Laura.
+No ar em **https://analaura.vercel.app** (deploy automático do Vercel a cada push na `main`).
 
-## Rodar
+- **Site** (`/`): serviços, agendamento online com login Google, sinal no Pix, "Meus horários".
+- **Painel** (`/admin`): agenda, clientes e fichas, financeiro, serviços, configurações.
+- **Privacidade** (`/privacidade`): política de privacidade (LGPD).
+
+## Tecnologias
+
+React 19 + Vite + Tailwind v4 no site; **Firebase** (login Google + Firestore) como banco;
+**funções do Vercel** (`api/`) para o que precisa de chave secreta: Mercado Pago, Telegram, Google Agenda e e-mail.
+
+## Rodar local
 
 ```
 npm install
 npm run dev        # http://localhost:5173
-npm run build      # gera /dist (vercel.json já configurado)
+npm run build
 ```
 
 > No PowerShell, se aparecer "execução de scripts foi desabilitada", use `npm.cmd run dev`.
 
-- Site: `/` · Painel: `/admin`
-- Login simulado (botão **Entrar**):
-  - **Cliente Demo**: tem histórico e a manutenção do Volume Brasileiro vencendo
-  - **Bianca Pendente**: faltou numa manutenção e tem multa em aberto, fica bloqueada até pagar
-  - **Ana Laura (administradora)**: acesso ao painel
-- Para recriar os dados de exemplo: Painel → Configurações → Recriar dados de exemplo.
+Local, o site usa o mesmo Firebase de produção, mas as funções de `api/` **não rodam** (só no Vercel):
+agendar funciona, mas Pix, avisos e e-mails só em `analaura.vercel.app`.
 
-## Visual
+## Como funciona o agendamento
 
-- Paleta preto e cinza (pedido da Ana): o **site é escuro** e o **painel é claro**, com a mesma paleta
-  (`src/index.css`, classe `tema-escuro`).
-- Capa com as fotos trocando sozinhas (preto e branco, zoom lento) e o logotipo LC no centro.
-- Fotos em `public/img` (WebP otimizado). Os arquivos originais ficam em `assets-originais/`, fora do site.
-- Para trocar a foto de um serviço: Painel → Serviços → editar → "Foto do card".
+1. A cliente entra com Google, escolhe serviços, dia e horário (o site mostra o intervalo inteiro que o serviço ocupa).
+2. **Com sinal ligado** (padrão): o horário nasce `aguardando` e fica segurado por 15 min. O site pede o Pix a
+   `api/pix` (valor calculado no servidor), mostra QR + copia e cola e espera.
+3. Quando o Pix cai, o Mercado Pago chama `api/mercadopago`. A função **consulta a order na API** (não confia no aviso),
+   muda o horário para `agendado` e dispara os avisos. Pagou depois do prazo e o horário já foi pego, ou desistiu: o Pix volta sozinho.
+4. Avisos (`api/avisos`): Telegram da Ana, evento na Google Agenda do estúdio, e-mail para a cliente (com .ics) e
+   Telegram da cliente, se ela ativou no bot.
+5. **Cancelou:** o sinal volta pelo Pix (opção no painel para reter em cima da hora). **Faltou:** a Ana fica com o sinal
+   e o site gera multa de 20% (sem sinal, a multa é 50%). Com multa em aberto, a cliente só agenda depois de pagar
+   (Pix automático também).
+6. Todo dia às 18h (`api/lembretes`, Cron do Vercel): lembrete para as clientes de amanhã, agenda do dia seguinte
+   para a Ana e limpeza dos horários que esperaram Pix e venceram.
 
-## Serviços e manutenção
+Regras do sinal em `src/lib/sinal.js`; valores (%, prazo) em Painel → Configurações.
 
-- **Cílios:** 8 modelos. Cada um tem a **própria manutenção** (preço e prazo) e alguns também são feitos em **marrom** (mesmo preço).
-  No site é um card por modelo, com aplicação e manutenção lado a lado. Ao agendar, a cliente escolhe
-  Aplicação/Manutenção/Remoção e o modelo; a cor é combinada no atendimento.
-- **Sobrancelhas:** Design Personalizado, Henna, Tintura, Brow Lamination e Brow Lamination com Tintura.
-- **Remoção Química.**
-- Internamente o agendamento guarda um id de variação (`fox.marrom.manutencao`), veja `src/lib/catalogo.js`.
+## Banco (Firestore)
 
-## Regras de agendamento (igual ao Arian)
-
-1. A cliente precisa entrar com Google para agendar. Não tem sinal: o horário é confirmado na hora e o pagamento é no dia.
-2. Ela pode cancelar sozinha até 24h antes (`antecedenciaCancelHoras`). Depois disso, o site pede para falar com a Ana.
-3. Falta sem aviso gera **multa de 50%** (`multaPct`). Com multa em aberto ela não agenda até pagar pelo Pix do site.
-4. A Ana também pode cancelar com ou sem multa e lançar débitos manuais.
-
-## Painel
-
-| Página | O que tem |
+| Coleção | Quem lê / escreve |
 | --- | --- |
-| Início | Agenda do dia, faturamento do mês, ocupação da semana e **"Precisa da sua atenção"**: lembrar as clientes de amanhã, multas em aberto, manutenções vencendo (pelo prazo de cada modelo) e aniversariantes, com mensagem de WhatsApp pronta |
-| Agenda | Semana, linha do tempo do dia com horários livres agrupados e almoço; atendida (com forma de pagamento), falta (gera multa), cancelar com ou sem multa, remarcar, bloquear horário ou dia |
-| Clientes | Busca e filtros (com horário, manutenção, devendo, sumidas) e **ficha da cliente**: ficha técnica (modelo, cor, curvatura, espessura, mapping, cola, alergias), histórico, multas e dados |
-| Financeiro | Resumo com gráficos (inclusive aplicação × manutenção), **entradas** (cada atendimento e multa paga; exporta planilha) e multas/débitos |
-| Serviços | Preço da aplicação, manutenção (preço, duração e prazo), marrom, ordem no site e prévia do card |
-| Configurações | Horários, cancelamento e multa, Pix e dados do estúdio |
+| `config/estudio`, `servicos` | público lê; admin escreve |
+| `ocupados` | público lê (só data/hora, sem dados pessoais); espelha os agendamentos |
+| `agendamentos` | cliente lê os dela e cria/cancela; admin tudo; servidor confirma o sinal |
+| `clientes`, `pendencias` | cliente os dela; admin tudo |
+| `fichas`, `notificacoes`, `admins` | admin |
+| `privado`, `cobrancas` | só o servidor (Telegram da Ana, cobranças Pix) |
+
+Regras em [`firestore.rules`](firestore.rules). **Ao mudar, publicar no Console do Firebase** (Firestore → Regras).
+Administradoras: `leandrofls16@gmail.com` + os e-mails em Painel → Configurações → Acesso ao painel.
+
+## Variáveis de ambiente (Vercel, nunca no código)
+
+| Variável | O quê |
+| --- | --- |
+| `FIREBASE_SERVICE_ACCOUNT` | JSON da conta de serviço do Firebase (também escreve na Google Agenda) |
+| `MERCADOPAGO_ACCESS_TOKEN` | Access Token de produção da aplicação no Mercado Pago |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Assinatura secreta do webhook (evento "Order (Mercado Pago)" → `/api/mercadopago`) |
+| `TELEGRAM_BOT_TOKEN` | token do @LauraCelvioBot |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | `lauracelviosalao@gmail.com` + senha de app (envio de e-mails) |
+| `GOOGLE_CALENDAR_ID` | opcional; padrão = `GMAIL_USER` (agenda compartilhada com a conta de serviço) |
+| `CRON_SECRET` | protege `/api/lembretes` (o Vercel envia sozinho no Cron) |
+
+Depois de mudar uma variável: **Redeploy**. A chave web do Firebase em `src/lib/firebase.js` é pública por natureza.
+
+## Segurança
+
+- Regras do Firestore por coleção e por campo (cliente não escolhe status, não grava campos internos, prazo de reserva ≤ 30 min).
+- Funções conferem o login (token do Firebase) e recalculam valores no servidor; webhooks conferem a origem
+  (assinatura do Telegram; Mercado Pago consultado na API).
+- Cabeçalhos em `vercel.json`: CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy.
+- `/admin` e `/api` fora do Google (`robots.txt` + `X-Robots-Tag`).
 
 ## Estrutura
 
 ```
+api/
+  _lib/servidor.js      Firebase Admin, login, Telegram, Google Agenda, e-mail (Gmail)
+  _lib/mercadopago.js   Pix: criar, consultar, devolver
+  avisos.js             avisos de novo/cancelado/alterado, devolução do sinal, Telegram da Ana, teste
+  pix.js                Pix do sinal e das multas
+  mercadopago.js        webhook do Mercado Pago
+  telegram.js           webhook do bot
+  lembretes.js          Cron diário
+  ics.js                arquivo de agenda (iPhone)
 src/
-  data/seed.js          dados fictícios + config padrão + serviços
-  store/Store.jsx       "backend" do esboço: todas as ações (agendar, falta, multa, pagar...)
-  lib/catalogo.js       variações dos serviços (aplicação/manutenção, preto/marrom)
-  lib/schedule.js       horários e conflitos da agenda
-  lib/stats.js          métricas, livro-caixa, manutenção vencendo, aniversariantes
-  lib/pix.js            Pix copia e cola (BR Code + CRC16)
-  components/site/      seções do site e modais da cliente
-  components/admin/     card de atendimento, ficha da cliente, gráficos, modais
-  pages/admin/          Início, Agenda, Clientes, Financeiro, Serviços, Configurações
+  data/seed.js          config padrão + serviços (semeados no 1º login de admin)
+  store/Store.jsx       estado (Firestore em tempo real) e todas as ações
+  lib/                  catalogo (variações), schedule (agenda), sinal, stats, lembretes (links de agenda), pix (Pix reserva)
+  components/site/      seções do site, agendamento, Pix, modais da cliente
+  components/admin/     card de atendimento, ficha da cliente, gráficos
+  pages/                Site, Privacidade, admin/*
 ```
 
 ## A confirmar com a Ana
 
-Tudo marcado com `A CONFIRMAR` em `src/data/seed.js`: bairro/cidade, nome do titular do Pix (CNPJ),
-preço da manutenção do Volume Brasileiro, Angel, Luxo e Power (estimados), duração das manutenções (90 min)
-e da Design com Tintura, e as regras de cancelamento/multa.
-Faltam fotos de: Volume Brasileiro, Egípcio, Angel, Luxo e Design com Tintura (por enquanto mostram o desenho).
-
-## Fase 2
-
-- Login com Google de verdade + banco de dados (Firebase/Supabase), mantendo as ações do `Store.jsx`.
-- Pix com confirmação automática para multas (Mercado Pago/Asaas/Efí + webhook).
-- Fotos reais de cada modelo nos cards (as das prints dela).
+Marcado com `A CONFIRMAR` em `src/data/seed.js`: bairro/cidade, preço da manutenção do Volume Brasileiro, Angel,
+Luxo e Power (estimados), duração das manutenções (90 min) e da Tintura.
