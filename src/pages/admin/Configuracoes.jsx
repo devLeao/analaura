@@ -152,7 +152,7 @@ export default function Configuracoes() {
             )}
           </div>
           <p className="text-xs text-cacau-500">
-            Os agendamentos também entram sozinhos na agenda do Google <strong>lauracelvio@gmail.com</strong>, com alarme 1h antes. As clientes recebem confirmação e lembrete por e-mail (e pelo Telegram, se ativarem).
+            Os agendamentos também entram sozinhos na agenda do Google <strong>lauracelviosalao@gmail.com</strong>, com alarme 1h antes. As clientes recebem confirmação e lembrete por e-mail (e pelo Telegram, se ativarem).
           </p>
         </Secao>
 

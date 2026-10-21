@@ -2,7 +2,7 @@
 // As chaves ficam SÓ nas variáveis de ambiente do Vercel:
 //   FIREBASE_SERVICE_ACCOUNT  conteúdo do .json da conta de serviço do Firebase
 //   TELEGRAM_BOT_TOKEN        token do @LauraCelvioBot (BotFather)
-//   GMAIL_USER                lauracelvio@gmail.com
+//   GMAIL_USER                lauracelviosalao@gmail.com
 //   GMAIL_APP_PASSWORD        senha de app do Gmail
 //   GOOGLE_CALENDAR_ID        (opcional) agenda da Ana; padrão = GMAIL_USER
 import { createHash } from 'node:crypto'
