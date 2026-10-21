@@ -123,7 +123,7 @@ Vou te lembrar na véspera.`),
 }
 
 /** Botão "Enviar teste" do painel: testa cada aviso e devolve o erro exato de cada um. */
-async function testar(quem) {
+export async function testar(quem) {
   const tentar = async (f) => {
     try {
       await f()
