@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { lerVid, montarVid, prazoLabel, resolver, TEMAS_CILIOS, TEMA_NEUTRO } from '../../lib/catalogo'
-import { brl } from '../../lib/format'
+import { brl, duracaoLabel } from '../../lib/format'
 
 /** Em qual "parte" do agendamento cada serviço entra: remoção fica junto de cílios. */
 export const parteDe = (servicos, vid) => (resolver(servicos, vid)?.categoria === 'sobrancelhas' ? 'sobrancelhas' : 'cilios')
@@ -13,20 +13,27 @@ export const parteDe = (servicos, vid) => (resolver(servicos, vid)?.categoria ==
  * Ao escolher, a parte fecha e mostra só o que foi escolhido (com Trocar / remover).
  * Depois de escolher um modelo que também é feito em marrom, aparece a escolha da cor,
  * para a Ana saber com antecedência se precisa ter fios marrons.
+ * Na aplicação dá para marcar que a cliente vem com extensão de outra profissional:
+ * a remoção entra junto, antes da aplicação nova.
  * `sel` é a lista de ids de variação (ver lib/catalogo.js).
  */
 export default function SeletorServicos({ servicos, sel, onChange, compacto = false }) {
-  const ciliosVid = sel.find((v) => parteDe(servicos, v) === 'cilios')
-  const sobVid = sel.find((v) => parteDe(servicos, v) === 'sobrancelhas')
+  const ehCat = (v, cat) => resolver(servicos, v)?.categoria === cat
+  const ciliosVid = sel.find((v) => ehCat(v, 'cilios'))
+  const remocaoVid = sel.find((v) => ehCat(v, 'remocao'))
+  const sobVid = sel.find((v) => ehCat(v, 'sobrancelhas'))
+  const remocao = servicos.find((s) => s.categoria === 'remocao')
   const [trocando, setTrocando] = useState({ cilios: false, sobrancelhas: false })
-  const [modo, setModo] = useState(() =>
-    !ciliosVid ? 'aplicacao' : resolver(servicos, ciliosVid)?.categoria === 'remocao' ? 'remocao' : lerVid(ciliosVid).manutencao ? 'manutencao' : 'aplicacao'
-  )
+  const [modo, setModo] = useState(() => (ciliosVid ? (lerVid(ciliosVid).manutencao ? 'manutencao' : 'aplicacao') : remocaoVid ? 'remocao' : 'aplicacao'))
 
-  /** Troca o item de uma parte mantendo a outra. */
-  const definir = (parte, atual, novo) => {
-    onChange([...sel.filter((v) => v !== atual), ...(novo ? [novo] : [])])
-    setTrocando((t) => ({ ...t, [parte]: false }))
+  /** Troca a parte de cílios inteira: o modelo (ou nenhum) e, se pedido, a remoção antes. */
+  const definirCilios = (modelo, comRemocao) => {
+    onChange([...sel.filter((v) => !ehCat(v, 'cilios') && !ehCat(v, 'remocao')), ...(comRemocao && remocao ? [remocao.id] : []), ...(modelo ? [modelo] : [])])
+    setTrocando((t) => ({ ...t, cilios: false }))
+  }
+  const definirSobrancelha = (novo) => {
+    onChange([...sel.filter((v) => v !== sobVid), ...(novo ? [novo] : [])])
+    setTrocando((t) => ({ ...t, sobrancelhas: false }))
   }
 
   const opcoesCilios =
@@ -39,25 +46,32 @@ export default function SeletorServicos({ servicos, sel, onChange, compacto = fa
               ? { vid: montarVid(s.id, { manutencao: true }), nome: s.nome, preco: s.manutencao.preco, obs: `até ${prazoLabel(s.manutencao)}`, cores: TEMAS_CILIOS[s.id] || TEMA_NEUTRO }
               : { vid: s.id, nome: s.nome, preco: s.preco, cores: TEMAS_CILIOS[s.id] || TEMA_NEUTRO }
           )
-  const ciliosEscolhido = ciliosVid ? resolver(servicos, ciliosVid) : null
+  const modelo = ciliosVid ? resolver(servicos, ciliosVid) : null
+  const escolhidoCilios = modelo || (remocaoVid ? resolver(servicos, remocaoVid) : null)
   const opcoesSob = servicos.filter((s) => s.categoria === 'sobrancelhas').map((s) => ({ vid: s.id, nome: s.nome, preco: s.preco }))
 
   return (
     <div className={compacto ? 'space-y-3' : 'space-y-4'}>
       <Parte
         titulo="Cílios"
-        escolhido={ciliosEscolhido}
-        aberta={!ciliosVid || trocando.cilios}
+        escolhido={escolhidoCilios}
+        aberta={!escolhidoCilios || trocando.cilios}
         onTrocar={() => setTrocando((t) => ({ ...t, cilios: true }))}
         onManter={() => setTrocando((t) => ({ ...t, cilios: false }))}
-        onRemover={() => definir('cilios', ciliosVid, null)}
+        onRemover={() => definirCilios(null, false)}
         compacto={compacto}
-        extra={ciliosEscolhido?.base.marrom && (
-          <EscolhaCor
-            marrom={ciliosEscolhido.marrom}
-            onChange={(marrom) => definir('cilios', ciliosVid, montarVid(ciliosEscolhido.base.id, { manutencao: ciliosEscolhido.manutencao, marrom }))}
-          />
-        )}
+        extra={
+          modelo && (
+            <>
+              {modelo.base.marrom && (
+                <EscolhaCor marrom={modelo.marrom} onChange={(marrom) => definirCilios(montarVid(modelo.base.id, { manutencao: modelo.manutencao, marrom }), !!remocaoVid)} />
+              )}
+              {!modelo.manutencao && remocao && (
+                <RemoverAnterior marcado={!!remocaoVid} remocao={remocao} onChange={(v) => definirCilios(ciliosVid, v)} />
+              )}
+            </>
+          )
+        }
       >
         <div className="inline-flex bg-nude-100 rounded-full p-1 gap-1 mb-3">
           {[['aplicacao', 'Aplicação'], ['manutencao', 'Manutenção'], ['remocao', 'Remoção']].map(([id, nome]) => (
@@ -71,7 +85,14 @@ export default function SeletorServicos({ servicos, sel, onChange, compacto = fa
             </button>
           ))}
         </div>
-        <Lista opcoes={opcoesCilios} atual={ciliosVid} onEscolher={(vid) => definir('cilios', ciliosVid, vid)} compacto={compacto} />
+        {modo === 'remocao' && <p className="text-xs text-cacau-500 -mt-1 mb-3">Só a remoção. Para tirar a extensão antiga e já colocar uma nova, escolha em Aplicação.</p>}
+        <Lista
+          opcoes={opcoesCilios}
+          atual={modo === 'remocao' ? remocaoVid : ciliosVid}
+          // trocando de modelo na aplicação, mantém a remoção marcada
+          onEscolher={(vid) => (modo === 'remocao' ? definirCilios(null, true) : definirCilios(vid, modo === 'aplicacao' && !!remocaoVid && !!ciliosVid))}
+          compacto={compacto}
+        />
       </Parte>
 
       <Parte
@@ -80,10 +101,10 @@ export default function SeletorServicos({ servicos, sel, onChange, compacto = fa
         aberta={!sobVid || trocando.sobrancelhas}
         onTrocar={() => setTrocando((t) => ({ ...t, sobrancelhas: true }))}
         onManter={() => setTrocando((t) => ({ ...t, sobrancelhas: false }))}
-        onRemover={() => definir('sobrancelhas', sobVid, null)}
+        onRemover={() => definirSobrancelha(null)}
         compacto={compacto}
       >
-        <Lista opcoes={opcoesSob} atual={sobVid} onEscolher={(vid) => definir('sobrancelhas', sobVid, vid)} compacto={compacto} />
+        <Lista opcoes={opcoesSob} atual={sobVid} onEscolher={(vid) => definirSobrancelha(vid)} compacto={compacto} />
       </Parte>
     </div>
   )
@@ -173,5 +194,21 @@ function EscolhaCor({ marrom, onChange }) {
         ))}
       </div>
     </div>
+  )
+}
+
+/** Cliente com extensão feita por outra profissional: remove antes de aplicar a nova. */
+function RemoverAnterior({ marcado, remocao, onChange }) {
+  return (
+    <label className="flex items-start gap-3 mt-3 pl-9 cursor-pointer group">
+      <input type="checkbox" checked={marcado} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <span className={`mt-0.5 h-4 w-4 shrink-0 rounded border flex items-center justify-center transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-blush-400 ${marcado ? 'bg-cacau-900 border-cacau-900 text-nude-50' : 'border-nude-400 group-hover:border-cacau-500'}`}>
+        {marcado && <Check size={11} strokeWidth={3} />}
+      </span>
+      <span className="text-sm leading-snug">
+        <span className="text-cacau-900">Estou com extensão de outra profissional</span>
+        <span className="block text-xs text-cacau-500">Removemos antes de aplicar a nova · +{brl(remocao.preco)} · +{duracaoLabel(remocao.duracao)}</span>
+      </span>
+    </label>
   )
 }

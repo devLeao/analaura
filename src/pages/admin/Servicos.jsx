@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, Clock, ChevronUp, ChevronDown, EyeOff, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, Trash2, Clock, ChevronUp, ChevronDown, EyeOff, RefreshCw, Upload, Loader2 } from 'lucide-react'
 import { useStore } from '../../store/Store'
 import { Cabecalho, Botao, Toggle, Campo, Etiqueta } from '../../components/admin/ui'
 import { Pilulas } from '../../components/admin/Escolhas'
@@ -8,11 +8,16 @@ import { Intensidade, Cores } from '../../components/site/Servicos'
 import Modal from '../../components/ui/Modal'
 import { CATEGORIAS, prazoLabel } from '../../lib/catalogo'
 import { brl, duracaoLabel } from '../../lib/format'
+import { comprimirFoto } from '../../lib/fotos'
 
 const NOVO = { nome: '', categoria: 'cilios', preco: 0, duracao: 120, desc: '', ativo: true, intensidade: 3, leque: 3, marrom: false, manutencao: { preco: 0, duracao: 90, dias: 21, diasMin: null }, desenho: 'design', foto: null }
 
-// Fotos que já estão no site (public/img/servicos). Para uma foto nova, basta colocar o arquivo lá e incluir aqui.
+// Fotos que já estão no site (public/img/servicos). A Ana também pode enviar uma foto nova pelo botão "Enviar".
 const FOTOS = [
+  ['/img/servicos/brasileiro.webp', 'Volume Brasileiro'],
+  ['/img/servicos/egipcio.webp', 'Volume Egípcio'],
+  ['/img/servicos/angel.webp', 'Volume Angel'],
+  ['/img/servicos/luxo.webp', 'Volume Luxo'],
   ['/img/servicos/fox.webp', 'Efeito Fox'],
   ['/img/servicos/glamour.webp', 'Volume Glamour'],
   ['/img/servicos/power.webp', 'Glamour Power'],
@@ -20,6 +25,8 @@ const FOTOS = [
   ['/img/servicos/lamination.webp', 'Brow Lamination'],
   ['/img/servicos/henna.webp', 'Henna'],
   ['/img/servicos/design.webp', 'Design'],
+  ['/img/servicos/tintura.webp', 'Design com Tintura'],
+  ['/img/servicos/lamination-tintura.webp', 'Lamination com Tintura'],
   ['/img/capa/modelo.webp', 'Modelo'],
 ]
 
@@ -96,6 +103,7 @@ export default function Servicos() {
 function Editor({ item, onFechar }) {
   const { salvarServico, removerServico, avisar } = useStore()
   const [f, setF] = useState({ ...NOVO, ...item, manutencao: item.manutencao ? { ...item.manutencao } : null })
+  const [enviando, setEnviando] = useState(false)
   const [confirmarExclusao, setConfirmarExclusao] = useState(false)
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
   const setM = (k) => (e) => setF({ ...f, manutencao: { ...f.manutencao, [k]: e.target.value } })
@@ -142,11 +150,39 @@ function Editor({ item, onFechar }) {
               <button type="button" onClick={() => setF({ ...f, foto: null })} className={`aspect-square rounded-xl border flex items-center justify-center text-[10px] text-cacau-500 cursor-pointer ${!f.foto ? 'ring-2 ring-cacau-900 border-cacau-900' : 'border-nude-300 hover:border-cacau-500'}`}>
                 sem foto
               </button>
+              {f.foto?.startsWith('data:') && (
+                <span className="aspect-square rounded-xl overflow-hidden ring-2 ring-cacau-900" title="Foto enviada">
+                  <img src={f.foto} alt="Foto enviada" className="h-full w-full object-cover" />
+                </span>
+              )}
               {FOTOS.map(([src, nome]) => (
                 <button key={src} type="button" title={nome} onClick={() => setF({ ...f, foto: src })} className={`aspect-square rounded-xl overflow-hidden cursor-pointer ${f.foto === src ? 'ring-2 ring-cacau-900' : 'opacity-70 hover:opacity-100'}`}>
                   <img src={src} alt={nome} className="h-full w-full object-cover" />
                 </button>
               ))}
+              <label className="aspect-square rounded-xl border border-dashed border-nude-400 hover:border-cacau-500 flex flex-col items-center justify-center gap-1 text-[10px] text-cacau-600 cursor-pointer">
+                {enviando ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                Enviar
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const arq = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!arq) return
+                    setEnviando(true)
+                    try {
+                      setF((atual) => ({ ...atual, foto: null }))
+                      const src = await comprimirFoto(arq, { lado: 1000 })
+                      setF((atual) => ({ ...atual, foto: src }))
+                    } catch (err) {
+                      avisar(err.message, 'erro')
+                    }
+                    setEnviando(false)
+                  }}
+                />
+              </label>
             </div>
           </Campo>
 

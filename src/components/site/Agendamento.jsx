@@ -259,18 +259,21 @@ export default function Agendamento({ servicoInicial, onLogin, onPagarPendencias
               {/* Itens separados por parte, na mesma ordem do lado esquerdo */}
               <ul className="space-y-3">
                 {[['cilios', 'Cílios'], ['sobrancelhas', 'Sobrancelhas']].map(([parte, rotulo]) => {
-                  const it = itens.find((i) => parteDe(servicos, i.vid) === parte)
-                  if (!it) return null
+                  // cílios pode ter dois itens: remoção da extensão anterior + aplicação nova
+                  const daParte = itens.filter((i) => parteDe(servicos, i.vid) === parte)
+                  if (!daParte.length) return null
                   return (
                     <li key={parte}>
                       <div className="text-[10px] font-label uppercase tracking-[0.2em] text-blush-600">{rotulo}</div>
-                      <div className="flex items-center gap-2 text-sm mt-0.5">
+                      {daParte.map((it) => (
+                      <div key={it.vid} className="flex items-center gap-2 text-sm mt-0.5">
                         <span className="flex-1 text-cacau-800">{it.nome}</span>
                         <span className="text-cacau-600 tabular-nums whitespace-nowrap">{brl(it.preco)}</span>
                         <button onClick={() => escolher(selecionados.filter((v) => v !== it.vid))} className="p-1 -mr-1 rounded-full text-cacau-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer" aria-label={`Remover ${it.nome}`}>
                           <X size={14} />
                         </button>
                       </div>
+                      ))}
                     </li>
                   )
                 })}

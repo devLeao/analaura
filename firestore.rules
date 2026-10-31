@@ -41,6 +41,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if ehAdmin();
     }
+    // Fotos da seção "Resultados" (a Ana envia pelo painel)
+    match /galeria/{id} {
+      allow read: if true;
+      allow write: if ehAdmin();
+    }
 
     // Horários ocupados, sem dados pessoais (o site usa para mostrar o que está livre)
     match /ocupados/{id} {

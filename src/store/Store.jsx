@@ -4,7 +4,7 @@ import {
   collection, doc, onSnapshot, query, where, orderBy, limit, writeBatch, setDoc, getDoc, deleteDoc,
 } from 'firebase/firestore'
 import { auth, fs, googleProvider, SUPER_ADMIN } from '../lib/firebase'
-import { CONFIG_PADRAO, SERVICOS } from '../data/seed'
+import { CONFIG_PADRAO, SERVICOS, GALERIA_PADRAO } from '../data/seed'
 import { uid, toISO, brl, dataBR, addDays } from '../lib/format'
 import { itensDe } from '../lib/catalogo'
 import { ocupaAgenda } from '../lib/schedule'
@@ -78,6 +78,7 @@ export function StoreProvider({ children }) {
   const [pendencias, setPendencias] = useState([])
   const [notificacoes, setNotificacoes] = useState([])
   const [admins, setAdmins] = useState([])
+  const [galeria, setGaleria] = useState(null)
 
   const avisar = useCallback((msg, tipo = 'ok') => {
     setToast({ msg, tipo, id: uid() })
@@ -135,6 +136,7 @@ export function StoreProvider({ children }) {
       onSnapshot(ref('config', 'estudio'), (s) => setConfig(s.exists() ? { ...CONFIG_PADRAO, ...s.data() } : null), erro),
       onSnapshot(collection(fs, 'servicos'), (s) => setServicos(comId(s)), erro),
       onSnapshot(query(collection(fs, 'ocupados'), where('data', '>=', ontem)), (s) => setOcupados(comId(s)), erro),
+      onSnapshot(collection(fs, 'galeria'), (s) => setGaleria(comId(s).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))), erro),
     ]
     return () => subs.forEach((f) => f())
   }, [])
@@ -179,9 +181,34 @@ export function StoreProvider({ children }) {
     gravar(b.commit()).then(() => avisar('Serviços e configurações iniciais publicados.'))
   }, [ehAdmin, servicos, gravar, avisar])
 
+  // Atualizações de conteúdo que rodam uma vez quando a admin entra (marcadas em config)
+  const atualizado = useRef({})
+  useEffect(() => {
+    if (!ehAdmin || !config || !servicos?.length) return
+    // Fotos novas dos serviços (out/2026): preenche só os que estão sem foto
+    if (!config.fotosServicosV2 && !atualizado.current.fotos) {
+      atualizado.current.fotos = true
+      const b = writeBatch(fs)
+      SERVICOS.forEach((p) => {
+        const atual = servicos.find((x) => x.id === p.id)
+        if (atual && !atual.foto && p.foto) b.set(ref('servicos', p.id), { foto: p.foto }, { merge: true })
+      })
+      b.set(ref('config', 'estudio'), { fotosServicosV2: true }, { merge: true })
+      gravar(b.commit())
+    }
+    // Galeria passa a ser editável no painel: começa com as fotos que já estavam no site
+    if (!config.galeriaIniciada && galeria !== null && !atualizado.current.galeria) {
+      atualizado.current.galeria = true
+      const b = writeBatch(fs)
+      if (!galeria.length) GALERIA_PADRAO.forEach((g, i) => b.set(doc(collection(fs, 'galeria')), { ...g, ordem: i, criadoEm: new Date().toISOString() }))
+      b.set(ref('config', 'estudio'), { galeriaIniciada: true }, { merge: true })
+      gravar(b.commit())
+    }
+  }, [ehAdmin, config, servicos, galeria, gravar])
+
   // ---------- Ações ----------
   const estado = useRef({})
-  estado.current = { agendamentos, servicos, config, pendencias, notificacoes, authUser }
+  estado.current = { agendamentos, servicos, config, pendencias, notificacoes, authUser, galeria }
 
   const acoes = useMemo(() => {
     const cfg = () => estado.current.config || CONFIG_PADRAO
@@ -366,6 +393,27 @@ export function StoreProvider({ children }) {
         return gravar(setDoc(ref('servicos', id), limpar({ ...dados, ordem: existe ? s.ordem : listaServicos().length })))
       },
       removerServico: (id) => gravar(deleteDoc(ref('servicos', id))),
+
+      // ---------- Galeria (seção "Resultados") ----------
+      adicionarFotos: (fotos) => {
+        const atual = estado.current.galeria || []
+        const ini = atual.reduce((m, g) => Math.max(m, (g.ordem ?? 0) + 1), 0)
+        const b = writeBatch(fs)
+        fotos.forEach((g, i) => b.set(doc(collection(fs, 'galeria')), { src: g.src, alt: g.alt || '', ordem: ini + i, criadoEm: new Date().toISOString() }))
+        return gravar(b.commit())
+      },
+      removerFoto: (id) => gravar(deleteDoc(ref('galeria', id))),
+      legendaFoto: (id, alt) => gravar(setDoc(ref('galeria', id), { alt }, { merge: true })),
+      moverFoto: (id, dir) => {
+        const lista = (estado.current.galeria || []).slice()
+        const i = lista.findIndex((g) => g.id === id)
+        const j = i + dir
+        if (i < 0 || j < 0 || j >= lista.length) return Promise.resolve()
+        ;[lista[i], lista[j]] = [lista[j], lista[i]]
+        const b = writeBatch(fs)
+        lista.forEach((g, k) => b.set(ref('galeria', g.id), { ordem: k }, { merge: true }))
+        return gravar(b.commit())
+      },
       /** Sobe/desce o serviço na ordem em que aparece no site. */
       moverServico: (id, dir) => {
         const lista = listaServicos().slice().sort((a, b) => a.ordem - b.ordem)
@@ -411,9 +459,11 @@ export function StoreProvider({ children }) {
       pendencias,
       notificacoes,
       admins,
+      // até a galeria ir para o banco (1º acesso da admin), o site mostra as fotos padrão
+      galeria: config?.galeriaIniciada && galeria ? galeria : GALERIA_PADRAO.map((g) => ({ ...g, id: g.src })),
       carregando: !authPronto || servicos === null,
     }
-  }, [config, servicos, ocupados, agendamentos, clientes, fichas, pendencias, notificacoes, admins, authPronto, ehAdmin])
+  }, [config, servicos, ocupados, agendamentos, clientes, fichas, pendencias, notificacoes, admins, galeria, authPronto, ehAdmin])
 
   const usuario = useMemo(() => {
     if (!authUser) return null

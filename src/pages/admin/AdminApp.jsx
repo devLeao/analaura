@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Route, Routes, Link, Navigate, useLocation } from 'react-router-dom'
 import {
   Home, CalendarDays, Users, Wallet, Sparkles, Settings, Bell, ExternalLink, LogOut, MoreHorizontal, X, Crown,
-  CheckCircle2, CalendarPlus, CalendarX, Info, Loader2,
+  CheckCircle2, CalendarPlus, CalendarX, Info, Loader2, Images,
 } from 'lucide-react'
 import Logo from '../../components/ui/Logo'
 import { GoogleG } from '../../components/site/Agendamento'
@@ -13,6 +13,7 @@ import Clientes from './Clientes'
 import Financeiro from './Financeiro'
 import Servicos from './Servicos'
 import Configuracoes from './Configuracoes'
+import Galeria from './Galeria'
 
 const MENU = [
   ['', 'Início', Home],
@@ -20,6 +21,7 @@ const MENU = [
   ['clientes', 'Clientes', Users],
   ['financeiro', 'Financeiro', Wallet],
   ['servicos', 'Serviços', Sparkles],
+  ['galeria', 'Galeria', Images],
   ['configuracoes', 'Configurações', Settings],
 ]
 const MOBILE_PRINCIPAL = ['', 'agenda', 'clientes', 'financeiro']
@@ -95,6 +97,7 @@ export default function AdminApp() {
           <Route path="clientes" element={<Clientes />} />
           <Route path="financeiro" element={<Financeiro />} />
           <Route path="servicos" element={<Servicos />} />
+          <Route path="galeria" element={<Galeria />} />
           <Route path="configuracoes" element={<Configuracoes />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
