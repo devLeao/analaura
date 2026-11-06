@@ -15,7 +15,7 @@ import { multaPara, sinalPago, restanteNoDia } from '../../lib/sinal'
 /** Mensagens prontas de WhatsApp (a Ana só aperta enviar). */
 export const mensagens = {
   lembrete: (ag) =>
-    `Oi, ${primeiroNome(ag.clienteNome)}! Passando pra lembrar do seu horário de ${ag.servicoNomes} ${dataLonga(ag.data).toLowerCase()} às ${ag.hora}. Venha sem maquiagem nos olhos, tá? Pode me confirmar?`,
+    `Oi, ${primeiroNome(ag.clienteNome)}! Passando pra lembrar do seu horário de ${ag.servicoNomes} ${dataLonga(ag.data).toLowerCase().replace(", 0", ", ")} às ${ag.hora}. Te espero.`,
 }
 
 export const linkWhats = (tel, texto) => `https://wa.me/${waNumero(tel)}${texto ? `?text=${encodeURIComponent(texto)}` : ''}`
